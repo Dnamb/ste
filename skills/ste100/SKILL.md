@@ -128,7 +128,8 @@ level itself.
    `<result stem>.review.json` in the same folder as the result JSON.
 5. Run `STE report "<result>.json" --review "<result stem>.review.json" --open`.
 6. Reply in chat:
-   - the score, the pass mark and PASS or FAIL;
+   - the first line: `**PASS**` or `**FAIL**`, then the score, the pass mark and the
+     level (for example `**FAIL**: score 62.5, pass mark 80, level 80`);
    - the 3 rules with the most counted findings, each with one example and its fix;
    - the coverage (what you reviewed, and what you did not);
    - the path of the HTML report.
