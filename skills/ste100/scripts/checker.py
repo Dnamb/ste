@@ -1046,6 +1046,366 @@ def _words(seg: Segment) -> Iterator[Finding]:
 
 
 # --------------------------------------------------------------------------
+# Heuristic detectors
+# --------------------------------------------------------------------------
+# ponytail: no POS tagger. These detectors use word lists and word order, so most
+# of their findings are "low" and count only when the LLM review confirms them.
+# Upgrade path: an optional POS tagger (for example spaCy) behind a --with extra.
+
+_FUNCTION = frozenset("""
+a an the this that these those it its they them their theirs there here he she his her we
+our ours you your yours i my me us him one ones is are was were be been being am has have
+had do does did will would shall should can could may might must not no nor and or but if
+then than so as at by for from in into of off on onto out over to under up down with
+without about after before between during through until when where which while who whom
+whose why how what all any each every some many much more most few less least other
+another such only also very too just even still again always never often both either
+neither per via against across along around behind below beneath beside beyond inside
+outside near since upon within toward towards because although though unless whether once
+yet else first next now later soon same own
+""".split())
+_LY_NOUNS = frozenset("supply assembly reply apply family anomaly fly butterfly multiply ally "
+                      "rally jelly belly monopoly poly italy".split())
+# Third-person verb forms end a noun run: "The fuel pump motor stops."
+_VERB_S = frozenset({v[:-1] + "ies" if re.search(r"[^aeiou]y$", v) else
+                     v + ("es" if v.endswith(("s", "x", "z", "ch", "sh")) else "s")
+                     for v in IMPERATIVE_VERBS}
+                    | set("contains includes requires operates protects reduces causes receives "
+                          "produces generates transmits".split()))
+
+
+def _is_adverb(lw: str) -> bool:
+    return lw.endswith("ly") and len(lw) > 3 and lw not in _LY_NOUNS
+
+
+_ING_STRONG = frozenset("by before after while when without".split())
+_ING_WEAK = frozenset("for of in on from to".split())
+_ING_PREPS = frozenset("according regarding concerning including excluding following "
+                       "considering notwithstanding".split())
+
+
+@detector("3.5", kinds=SENTENCE_KINDS)
+def _ing_forms(seg: Segment) -> Iterator[Finding]:
+    s = seg.masked
+    toks = list(TOKEN_RE.finditer(s))
+    for i, m in enumerate(toks):
+        w = m.group(0)
+        lw = w.lower()
+        if not is_ing(w) or lw in ADJ_ING or lw in _ING_PREPS or lw == "being":
+            continue
+        prev = toks[i - 1].group(0).lower() if i else ""
+        if prev in _BE_FORMS or prev in ("been", "being"):
+            continue   # 3.2 covers "is running"
+        nxt = toks[i + 1].group(0).lower() if i + 1 < len(toks) else ""
+        if prev in _ING_STRONG:
+            conf = "high"
+        elif prev in _ING_WEAK:
+            # "for cleaning the filter" is a verb; "for cooling" can be a noun.
+            conf = "high" if nxt in _DETERMINERS else "low"
+        elif i == 0 or s[toks[i - 1].end():m.start()].strip() == ",":
+            conf = "low"
+        else:
+            continue
+        yield _f(seg, "3.5", m.start(), m.end(), "Do not use an -ing form as a verb.",
+                 "Use a clause with a subject (\"before you remove\") or a verb.", conf=conf)
+
+
+_PASSIVE_RE = re.compile(
+    r"\b(am|is|are|was|were|be|been|being)\s+(?:(?:not|also|then|still|always|usually|"
+    r"automatically|now|only|never|often|immediately|first|already|fully|correctly|easily|"
+    r"quickly)\s+)?([A-Za-z]+)\b", re.I)
+_AGENT_RE = re.compile(r"(?:\s+[\w'-]+){0,3}?\s+[Bb]y\s+(?i:the|a|an|this|that|these|those|its|"
+                       r"their|your|our|you|us|them|users?|operators?|people)\b")
+# Participles that usually name a state after BE ("The valve is closed").
+ADJ_PP = frozenset("""
+closed damaged broken worn connected disconnected attached installed locked unlocked sealed
+cracked bent blocked clogged contaminated corroded enabled disabled filled loaded unloaded
+mounted located based tired interested pressurized energized charged discharged finished done
+gone frozen lost stuck aligned rugged complicated qualified experienced detailed
+""".split())
+
+
+@detector("3.6", kinds=SENTENCE_KINDS)
+def _passive(seg: Segment) -> Iterator[Finding]:
+    s = seg.masked
+    for m in _PASSIVE_RE.finditer(s):
+        word = m.group(2)
+        lw = word.lower()
+        if lw == "been" or not is_participle(word):
+            continue
+        before = [t.lower() for t in TOKEN_RE.findall(s, 0, m.start())[-3:] if t.lower() != "not"]
+        # "must be removed", "is to be removed": an instruction in the passive.
+        instr = m.group(1).lower() == "be" and bool(before) and (
+            before[-1] in ("must", "should", "shall")
+            or (before[-1] == "to" and len(before) > 1
+                and before[-2] in ("is", "are", "has", "have", "needs", "need")))
+        if _AGENT_RE.match(s, m.end()) or instr:
+            conf = "high"
+        elif lw in ADJ_PP or seg.kind not in ("proc", "warning", "caution"):
+            continue   # descriptive text may use the passive when the agent is not known
+        else:
+            conf = "low"
+        yield _f(seg, "3.6", m.start(), m.end(), "Use the active voice.",
+                 "Say who or what does the action: \"Remove the cover.\"", conf=conf)
+
+
+_NOMINAL_RE = re.compile(
+    r"\b(?:perform(?:s|ed|ing)?|carr(?:y|ies|ied|ying)\s+out|conduct(?:s|ed|ing)?|"
+    r"mak(?:e|es|ing)|made|do|does|did|doing|giv(?:e|es|ing)|gave|tak(?:e|es|ing)|took)\s+"
+    r"(?:(?:a|an|the|another|one|some|any|this|that)\s+)?"
+    r"(\w+(?:tion|sion|ment|ance|ence|ysis)|removal|approval|disposal|refusal|renewal|"
+    r"retrieval|arrival|failure|closure|exposure|review)\s+(?:of|on|to|for|with)\b", re.I)
+_NOT_NOMINAL = frozenset("station section option question function position condition solution "
+                         "caution portion sequence evidence audience science licence license "
+                         "sentence document element segment fragment instrument equipment "
+                         "environment department".split())
+
+
+@detector("3.7", kinds=SENTENCE_KINDS)
+def _nominals(seg: Segment) -> Iterator[Finding]:
+    for m in _NOMINAL_RE.finditer(seg.masked):
+        if m.group(1).lower() not in _NOT_NOMINAL:
+            yield _f(seg, "3.7", m.start(), m.end(), "Use a verb, not a noun, to show the action.",
+                     f"Use the verb for \"{m.group(1)}\".", conf="low")
+
+
+# The particle is in a lookahead, so "to back up" can still match "back up".
+_PARTICLE_RE = re.compile(r"\b([A-Za-z]+)(?=(\s+(?:up|out|off|down|away|back))\b"
+                          r"(?!\s+(?:to|from)\b))", re.I)
+# Verbs that are literal with a direction word ("Push the lever down" is not a phrasal verb).
+_LITERAL_MOVE = frozenset("go come move push pull lift lower raise slide fall walk climb run "
+                          "step put sit stand lie bend look".split())
+_PHRASAL_VERBS = (IMPERATIVE_VERBS | set("get pick shut break log sign wake figure sort point fill "
+                                         "back hook plug power boot wind burn wear cool warm heat "
+                                         "dry wipe throw call carry write cut".split())) - _LITERAL_MOVE
+
+
+def _verb_base(w: str) -> str:
+    """Base form of an inflected verb if it is in _PHRASAL_VERBS, else ""."""
+    cands = [w]
+    if w.endswith("ing"):
+        cands += [w[:-3], w[:-3] + "e", w[:-4]]
+    elif w.endswith("ied") or w.endswith("ies"):
+        cands += [w[:-3] + "y"]
+    elif w.endswith("ed"):
+        cands += [w[:-2], w[:-1], w[:-3]]
+    elif w.endswith("s"):
+        cands += [w[:-1], w[:-2]]
+    return next((c for c in cands if c in _PHRASAL_VERBS), "")
+
+
+@detector("9.3", kinds=SENTENCE_KINDS)
+def _phrasal(seg: Segment) -> Iterator[Finding]:
+    for m in _PARTICLE_RE.finditer(seg.masked):
+        if _verb_base(m.group(1).lower()):
+            end = m.end() + len(m.group(2))
+            yield _f(seg, "9.3", m.start(), end, f"\"{seg.text[m.start():end]}\" can be a "
+                     "phrasal verb.", "Use one verb with a clear meaning.", conf="low")
+
+
+@detector("2.1", kinds=SENTENCE_KINDS)
+def _noun_clusters(seg: Segment) -> Iterator[Finding]:
+    s = seg.masked
+    toks = list(TOKEN_RE.finditer(s))
+    runs: list[list[re.Match[str]]] = [[]]
+    for i, m in enumerate(toks):
+        w = m.group(0)
+        lw = w.lower()
+        joined = i > 0 and s[toks[i - 1].end():m.start()].isspace()
+        if not joined:
+            runs.append([])
+        run = runs[-1]
+        content = not (lw in _FUNCTION or _is_adverb(lw) or is_placeholder(w)
+                       or any(c.isdigit() for c in w))
+        if content and run and ((lw.endswith("ed") and is_participle(lw)) or lw in _VERB_S):
+            content = False    # a verb after the nouns ends the noun run
+        if content and not run and lw in IMPERATIVE_VERBS:
+            prev = toks[i - 1].group(0).lower() if i else ""
+            if not joined or prev in _VERB_CTX or prev in ("and", "then", "or"):
+                content = False    # "Install new ...", "can configure ..."
+        if content:
+            run.append(m)
+        elif run:
+            runs.append([])
+    for run in runs:
+        # A Title Case pair ("Claude Code") counts as one word (rule 8.6).
+        units = len(run) - sum(1 for a, b in zip(run, run[1:])
+                               if a.group(0)[0].isupper() and b.group(0)[0].isupper())
+        if units >= 4 and not all(t.group(0)[0].isupper() for t in run):
+            yield _f(seg, "2.1", run[0].start(), run[-1].end(),
+                     f"{units} words in a row can be one multi-word noun; the limit is 3.",
+                     "Use a preposition (\"the torque of the bolt\") or a hyphen.", conf="low")
+
+
+_HOLD_PAIR = ("press", "push", "click", "tap")
+
+
+@detector("5.2", kinds=("proc",))
+def _two_instructions(seg: Segment) -> Iterator[Finding]:
+    s = seg.masked
+    toks = [(m, m.group(0).lower()) for m in TOKEN_RE.finditer(s)]
+    for i, (m, w) in enumerate(toks):
+        if i == 0 or w not in ("and", "then") or (w == "then" and toks[i - 1][1] == "and"):
+            continue
+        j = i + 1
+        while j < len(toks) and toks[j][1] in ("then", "carefully", "slowly", "also",
+                                                "immediately", "never"):
+            j += 1
+        if j + 1 < len(toks) and toks[j][1] == "do" and toks[j + 1][1] == "not":
+            j += 2
+        if j >= len(toks) or toks[j][1] not in IMPERATIVE_VERBS:
+            continue
+        if toks[j][1] == "hold" and toks[i - 1][1] in _HOLD_PAIR:
+            continue   # "Push and hold" is one action
+        yield _f(seg, "5.2", m.start(), toks[j][0].end(), "Write one instruction in each sentence.",
+                 "Put each action in its own sentence or step.", conf="low")
+
+
+_NOT_VERB_START = frozenset("the a an this that these those it its there your our their you we "
+                            "they i he she one each all users user".split())
+_YOU_MUST_RE = re.compile(r"\b(?:you|users?|the\s+user|operators?|the\s+operator)\s+"
+                          r"(?:must|should|need\s+to|needs\s+to|have\s+to|has\s+to|will\s+need\s+to|"
+                          r"are\s+required\s+to|is\s+required\s+to)\b", re.I)
+
+
+@detector("5.3", kinds=("proc", "desc"))
+def _imperative(seg: Segment) -> Iterator[Finding]:
+    s = seg.masked
+    hits = list(_YOU_MUST_RE.finditer(s))
+    for m in hits:
+        yield _f(seg, "5.3", m.start(), m.end(), "Write the instruction as a command.",
+                 "Start with the verb: \"Close the valve.\"", conf="low")
+    if seg.kind == "proc" and seg.index == 0 and not hits and not is_imperative(s):
+        m = TOKEN_RE.search(s, _clause_start(s))
+        if m and (m.group(0).lower() in _NOT_VERB_START or is_ing(m.group(0))):
+            yield _f(seg, "5.3", m.start(), m.end(), "A step must start with a command verb.",
+                     "Start with the verb: \"Close the valve.\"", conf="low")
+
+
+_LATE_COND_RE = re.compile(r"\s(if|when|unless|whenever|in\s+case|provided|as\s+soon\s+as)\b",
+                           re.I)
+_ASK_VERBS = frozenset("check see verify determine find examine ask know test confirm tell show "
+                       "decide learn inspect".split())
+
+
+@detector("5.4", kinds=("proc",))
+def _condition_first(seg: Segment) -> Iterator[Finding]:
+    s = seg.masked
+    if not is_imperative(s):
+        return
+    for m in _LATE_COND_RE.finditer(s, _clause_start(s)):
+        if _prev_word(s, m.start()) not in _ASK_VERBS:   # "Check if ..." means "whether"
+            yield _f(seg, "5.4", m.start(1), m.end(1), "Put the condition first, then a comma.",
+                     "If <condition>, <instruction>.", conf="low")
+            return
+
+
+@detector("5.5", kinds=("note",))
+def _note_instruction(seg: Segment) -> Iterator[Finding]:
+    if is_imperative(seg.masked):
+        yield _f(seg, "5.5", _first_token_at(seg.masked), len(seg.text),
+                 "A note gives information. It does not give an instruction.",
+                 "Put the instruction in a step, or write the note as a fact.", conf="low")
+
+
+_STATEMENT_START = frozenset("the a an this these those it there that its".split())
+
+
+@detector("7.2", kinds=("warning", "caution"))
+def _safety_start(seg: Segment) -> Iterator[Finding]:
+    s = seg.masked
+    if seg.index != 0 or is_imperative(s):
+        return
+    m = TOKEN_RE.search(s, _clause_start(s))
+    if not m:
+        return
+    has_cond = _clause_start(s) > len(s) - len(s.lstrip())
+    high = not has_cond and m.group(0).lower() in _STATEMENT_START
+    yield _f(seg, "7.2", m.start(), m.end(),
+             "Start a safety instruction with a command or a condition.",
+             "Start with the command: \"Do not touch the surface. It is hot.\"",
+             conf="high" if high else "low")
+
+
+_RISK_RE = re.compile(r"\b(?:because|can|could|will|risk|danger|injur\w*|damage\w*|kill\w*|"
+                      r"hot|toxic|flammable|explosive|sharp|poison\w*|pressuri[sz]ed|burn\w*|"
+                      r"shock\w*)\b", re.I)
+
+
+@detector("7.3", doc=True)
+def _safety_reason(segs: list[Segment]) -> Iterator[Finding]:
+    groups: dict[tuple[str, int], list[Segment]] = defaultdict(list)
+    for seg in segs:
+        if seg.kind in ("warning", "caution"):
+            groups[(seg.file, seg.block)].append(seg)
+    for group in groups.values():
+        if len(group) == 1 and not _RISK_RE.search(group[0].masked):
+            yield _f(group[0], "7.3", 0, len(group[0].text), "Give a short explanation of the risk.",
+                     "Add a sentence such as \"The fluid can burn your skin.\"", conf="low")
+
+
+_INJURY_RE = re.compile(r"\b(?:injur(?:y|ies|e|ed)|kills?|killed|death|fatal|die|burns?|skin|"
+                        r"eyes?|electric\s+shock|hurt|cuts?\s+(?:you|your))\b", re.I)
+
+
+@detector("7.1", kinds=("caution",))
+def _signal_word(seg: Segment) -> Iterator[Finding]:
+    m = _INJURY_RE.search(seg.masked)
+    if m:
+        yield _f(seg, "7.1", m.start(), m.end(),
+                 "A risk of injury needs WARNING, not CAUTION.", "WARNING", conf="low")
+
+
+_NO_ARTICLE_OK = frozenset("""
+clear clean open closed tight loose free dry full empty clockwise counterclockwise
+anticlockwise aside away back forward together apart upward upwards downward downwards sure
+help care water oil grease power air fuel soap heat force paint data text access information
+""".split())
+_STEP_PREFIX = frozenset("please never always carefully slowly then now next first finally".split())
+
+
+@detector("4.5", kinds=("proc",))
+def _articles(seg: Segment) -> Iterator[Finding]:
+    s = seg.masked
+    toks = list(TOKEN_RE.finditer(s, _clause_start(s)))
+    words = [t.group(0).lower() for t in toks]
+    i = 0
+    while i < len(toks):
+        if words[i] in _STEP_PREFIX:
+            i += 1
+        elif words[i] == "do" and i + 1 < len(toks) and words[i + 1] == "not":
+            i += 2
+        else:
+            break
+    if i + 1 >= len(toks) or words[i] not in IMPERATIVE_VERBS:
+        return
+    noun, lw = toks[i + 1], words[i + 1]
+    w = noun.group(0)
+    if (not s[toks[i].end():noun.start()].isspace() or w[0].isupper() or lw in _FUNCTION
+            or lw in _NO_ARTICLE_OK or lw in IMPERATIVE_VERBS or _is_adverb(lw)
+            or is_placeholder(w) or any(c.isdigit() for c in w) or is_ing(w)
+            or (lw.endswith("s") and not lw.endswith("ss"))):   # a generic plural is fine
+        return
+    after = toks[i + 2].group(0) if i + 2 < len(toks) else ""
+    if after and (after[0].isdigit() or (len(after) == 1 and after.isupper())):
+        return   # a label: "valve 3", "button A"
+    yield _f(seg, "4.5", noun.start(), noun.end(),
+             "Use an article or a demonstrative before the noun.", f"the {w}", conf="low")
+
+
+_THIS_RE = re.compile(r"\b(this)\s+(?:is|was|can|could|will|would|causes?|caused|means|makes|"
+                      r"lets|gives|shows|helps|occurs|prevents|results|happens|does|has|also)\b",
+                      re.I)
+
+
+@detector("GR-4", kinds=SENTENCE_KINDS)
+def _this(seg: Segment) -> Iterator[Finding]:
+    for m in _THIS_RE.finditer(seg.masked):
+        yield _f(seg, "GR-4", m.start(1), m.end(1), "\"This\" needs a clear referent.",
+                 "Add a noun: \"This procedure ...\"", conf="low")
+
+
+# --------------------------------------------------------------------------
 # Analysis entry point
 # --------------------------------------------------------------------------
 
