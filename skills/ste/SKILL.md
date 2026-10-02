@@ -1,5 +1,5 @@
 ---
-name: ste100
+name: ste
 description: >-
   ASD-STE100 Simplified Technical English (STE): explain, write, rewrite and audit
   text with the STE rules. Use when the user asks to explain or write something "in
@@ -18,7 +18,7 @@ allowed-tools:
   - PowerShell(uv run *)
 ---
 
-# STE100
+# STE
 
 Write and audit text in ASD-STE100 Simplified Technical English (Issue 9). The
 rules in this skill are our own paraphrase. The official specification is free
@@ -54,7 +54,7 @@ The arguments are: `$ARGUMENTS`
 | `dict` | Dictionary |
 
 If the arguments are empty, use the mode that the request asks for (for example,
-"explain this in STE" is Explain). If the user typed only `/ste100`, run
+"explain this in STE" is Explain). If the user typed only `/ste`, run
 `STE status`, then show the settings and a one-line list of the modes.
 
 ## Rules for all modes
@@ -65,7 +65,7 @@ If the arguments are empty, use the mode that the request asks for (for example,
 - Keep the meaning. If STE cannot give the meaning, keep the sentence and say why.
 - Write your own replies in this skill in STE too.
 - The score is this tool's own measure. ASD-STE100 defines no score. Do not say
-  that text is "STE compliant" or "certified". Say that it "passes the STE100
+  that text is "STE compliant" or "certified". Say that it "passes the STE
   check at level N".
 - Change the settings files only when the user asks for it.
 
@@ -75,8 +75,8 @@ The level is a number from 0 to 100, or `lite` (60), `standard` (80) or `strict`
 (100). Use the first level that you find:
 
 1. a level in the current request;
-2. a level that the user set in this session with `/ste100 level`;
-3. the level in the "STE100 default style" context, if a hook added it;
+2. a level that the user set in this session with `/ste level`;
+3. the level in the "STE default style" context, if a hook added it;
 4. 80 (standard).
 
 At level N, use each card rule with a tag at or below the next preset at or above
@@ -141,9 +141,9 @@ because the checker did not run.
 
 ## Level mode
 
-- `/ste100 level <N|lite|standard|strict>`: use this level for the rest of the
-  session. Do not save it. Say that `/ste100 level <N> save` saves it.
-- `/ste100 level <N> save [--project]`: run `STE level <N>` (add `--project` if
+- `/ste level <N|lite|standard|strict>`: use this level for the rest of the
+  session. Do not save it. Say that `/ste level <N> save` saves it.
+- `/ste level <N> save [--project]`: run `STE level <N>` (add `--project` if
   the user gives it).
 
 ## Settings
@@ -159,7 +159,7 @@ Run the command, then show its output.
 | `allow rm <term> ... [--project]` | `STE allow rm "<term>" ... [--project]` |
 
 - Without `--project`, the change goes to the global settings for all projects.
-  With `--project`, it goes to `.claude/ste100.json` in this project, and it has
+  With `--project`, it goes to `.claude/ste.json` in this project, and it has
   priority over the global settings.
 - A change to the default style starts at the next session start or `/clear`.
 - Allow terms are the technical nouns and verbs of the project. The checker never
@@ -167,7 +167,7 @@ Run the command, then show its output.
 
 ## Dictionary
 
-`/ste100 dict import <pdf>` reads the user's own copy of the ASD-STE100
+`/ste dict import <pdf>` reads the user's own copy of the ASD-STE100
 specification and saves the dictionary for this user only:
 
 ```

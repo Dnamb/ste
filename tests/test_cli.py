@@ -23,7 +23,7 @@ VOID = {"meta", "br", "hr", "img", "input", "link", "wbr"}
 @pytest.fixture
 def cwd(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("STE100_NO_OPEN", "1")
+    monkeypatch.setenv("STE_NO_OPEN", "1")
     return tmp_path
 
 
@@ -145,7 +145,7 @@ def test_encodings_match_plain_utf8(cwd, encode):
 def test_cp1252_console_never_crashes(tmp_path):
     """Quotes with any character print on a cp1252 console (real subprocess)."""
     (tmp_path / "u.md").write_text("Utilize the → arrow; it is 中.", encoding="utf-8")
-    env = {**os.environ, "PYTHONIOENCODING": "cp1252", "STE100_NO_OPEN": "1"}
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252", "STE_NO_OPEN": "1"}
     p = subprocess.run([sys.executable, str(SCRIPTS / "ste.py"), "check", "u.md",
                         "--json-out", "u.json"], cwd=tmp_path, env=env, capture_output=True)
     assert p.returncode == 1, p.stderr
@@ -202,6 +202,6 @@ def test_open_respects_no_open(cwd, monkeypatch):
     monkeypatch.setattr(ste.webbrowser, "open", lambda url: opened.append(url))
     assert run("report", "doc.json", "--open") == 0
     assert opened == []
-    monkeypatch.delenv("STE100_NO_OPEN")
+    monkeypatch.delenv("STE_NO_OPEN")
     assert run("report", "doc.json", "--open", "--out", "x/y.html") == 0
     assert opened == [(cwd / "x/y.html").resolve().as_uri()]

@@ -1,4 +1,4 @@
-"""ste100 command line: check, report, status, default, level, allow, dict, hook.
+"""ste command line: check, report, status, default, level, allow, dict, hook.
 
 Run it with ``uv run --no-project --quiet ste.py <command> ...`` (stdlib only).
 Exit codes: 0 = pass (or success), 1 = the score is below the pass mark, 2 = usage
@@ -28,7 +28,7 @@ if __name__ == "__main__" and sys.argv[1:2] == ["hook"]:
 import checker  # noqa: E402
 import dictionary  # noqa: E402
 
-log = logging.getLogger("ste100")
+log = logging.getLogger("ste")
 
 TEXT_SUFFIXES = {".md", ".markdown", ".txt", ".rst"}
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "ste-reports", "__pycache__"}
@@ -146,7 +146,7 @@ def summary(result: dict, path: Path | None = None) -> str:
     verdict = "PASS" if sc["passed"] else "FAIL"
     bands = ", ".join(f"tier {t} {float(c) * 100:.0f}%" for t, c in sc["bands"].items())
     lines = [
-        f"STE100 {'audit' if result.get('reviewed') else 'check'}: {len(result['files'])} file(s), "
+        f"STE {'audit' if result.get('reviewed') else 'check'}: {len(result['files'])} file(s), "
         f"{sc['segments']} sentences, {sc['words']} words",
         f"Score {sc['score']:.1f} / pass mark {sc['pass_mark']}: {verdict}"
         + (" (no text)" if sc["no_text"] else ""),
@@ -175,8 +175,8 @@ def summary(result: dict, path: Path | None = None) -> str:
 
 
 def open_in_browser(path: Path) -> None:
-    if os.environ.get("STE100_NO_OPEN"):
-        log.info("STE100_NO_OPEN is set; not opening %s", path)
+    if os.environ.get("STE_NO_OPEN"):
+        log.info("STE_NO_OPEN is set; not opening %s", path)
         return
     try:
         webbrowser.open(path.resolve().as_uri())
@@ -264,7 +264,7 @@ def cmd_status(a: argparse.Namespace) -> int:
         return f"{path}" + ("" if path.exists() else " (not found)")
 
     lines = [
-        f"STE100 settings for {project}",
+        f"STE settings for {project}",
         f"  default style: {'on' if cfg['default'] else 'off'} (from {src['default']})",
         f"  level: {ste_config.level_name(level)}, rules up to tier "
         f"{ste_config.enforced_tier(level)} (from {src['level']})",
@@ -286,7 +286,7 @@ def _dict_status() -> str:
     except ValueError as exc:
         return f"damaged ({exc})"
     if not data:
-        return "none (curated word list only; see /ste100 dict import)"
+        return "none (curated word list only; see /ste dict import)"
     n = len(data["entries"])
     return (f"{n} entries from {data.get('source', '?')}, imported "
             f"{str(data.get('created', '?'))[:10]} ({dictionary.dict_path()})")
@@ -372,7 +372,7 @@ def build_parser() -> argparse.ArgumentParser:
                                             "else the current folder)")
     scope = argparse.ArgumentParser(add_help=False, parents=[proj])
     scope.add_argument("--project", action="store_true",
-                       help="save in <project>/.claude/ste100.json, not in the global settings")
+                       help="save in <project>/.claude/ste.json, not in the global settings")
 
     c = sub.add_parser("check", parents=[proj], help="check files, folders, globs or stdin (-)")
     c.add_argument("inputs", nargs="+")
@@ -415,7 +415,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    logging.basicConfig(level=logging.WARNING, format="ste100: %(message)s")
+    logging.basicConfig(level=logging.WARNING, format="ste: %(message)s")
     # Quotes from audited files can hold any character; never crash on a cp1252 console.
     for stream in (sys.stdout, sys.stderr):
         try:

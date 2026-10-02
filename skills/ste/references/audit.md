@@ -29,7 +29,7 @@ are in `rules.md` in this folder.
   - the word is a name, a label on a screen or quoted text;
   - the checker read the sentence incorrectly.
 - If the same technical noun is rejected many times, tell the user that
-  `/ste100 allow add "<term>"` stops these findings.
+  `/ste allow add "<term>"` stops these findings.
 - A `house` finding is house style. It is never scored. Do not review it.
 - When `dictionary` is `imported`, findings with source `dict` come from the
   user's own copy of the ASD-STE100 dictionary:

@@ -1,4 +1,4 @@
-# ste100
+# ste
 
 A Claude Code plugin for ASD-STE100 Simplified Technical English (STE).
 
@@ -25,31 +25,39 @@ compliance certificate. See [Legal](#legal).
 
 ## Install
 
+From GitHub, in Claude Code:
+
+```
+/plugin marketplace add Dnamb/ste
+/plugin install ste@ste
+```
+
+Start a new session, then run `/ste status` to see the settings.
+
 From a local clone:
 
 ```
-/plugin marketplace add C:\Projects\ASD-STE100_Skill
-/plugin install ste100@ste100
+git clone https://github.com/Dnamb/ste.git
+/plugin marketplace add <path to the clone>
+/plugin install ste@ste
 ```
 
-Start a new session, then run `/ste100 status` to see the settings.
-
 To try the plugin without installing it, start Claude Code from any folder with
-`claude --plugin-dir "C:\Projects\ASD-STE100_Skill"`.
+`claude --plugin-dir "<path to the clone>"`.
 
 ## Usage
 
 | Command | What it does |
 |---|---|
-| `/ste100 explain <question>` | Answer in STE. Free text after `/ste100` is also explain. |
-| `/ste100 rewrite <file or text>` | Write `<stem>.ste.md` next to the file, check it, and show the score before and after. |
-| `/ste100 audit <targets> [--level N] [--threshold N]` | Check, review and write the HTML report. Targets: files, folders, a quoted glob (`"docs/**/*.md"`), `last` (the last reply) or pasted text. |
-| `/ste100 level <N\|lite\|standard\|strict>` | Use this level for the rest of the session. Add `save` (and `--project`) to keep it. |
-| `/ste100 default on [level] [--project]` | Make STE the default reply style from the next session start or `/clear`. |
-| `/ste100 default off [--project]` | Stop the default style. |
-| `/ste100 status` | Show the settings and the file that each one comes from. |
-| `/ste100 allow add\|rm <term> ... [--project]` | Project terms (technical nouns and verbs) that the checker never flags. |
-| `/ste100 dict import <pdf>` | Read the dictionary from your own copy of the specification. See [Dictionary](#dictionary). |
+| `/ste explain <question>` | Answer in STE. Free text after `/ste` is also explain. |
+| `/ste rewrite <file or text>` | Write `<stem>.ste.md` next to the file, check it, and show the score before and after. |
+| `/ste audit <targets> [--level N] [--threshold N]` | Check, review and write the HTML report. Targets: files, folders, a quoted glob (`"docs/**/*.md"`), `last` (the last reply) or pasted text. |
+| `/ste level <N\|lite\|standard\|strict>` | Use this level for the rest of the session. Add `save` (and `--project`) to keep it. |
+| `/ste default on [level] [--project]` | Make STE the default reply style from the next session start or `/clear`. |
+| `/ste default off [--project]` | Stop the default style. |
+| `/ste status` | Show the settings and the file that each one comes from. |
+| `/ste allow add\|rm <term> ... [--project]` | Project terms (technical nouns and verbs) that the checker never flags. |
+| `/ste dict import <pdf>` | Read the dictionary from your own copy of the specification. See [Dictionary](#dictionary). |
 
 You do not have to use the slash command. "Explain how a heat pump works in
 STE", "rewrite this in Simplified Technical English" or "audit docs/setup.md
@@ -101,7 +109,7 @@ score.
 
 ## How an audit works
 
-1. The checker (`skills/ste100/scripts/checker.py`) reads the text. It skips
+1. The checker (`skills/ste/scripts/checker.py`) reads the text. It skips
    front matter, code blocks, inline code and URLs. It divides the text into
    sentences of the kinds procedure, description, note, warning, caution,
    title and table cell, and it counts words as section 8 of the
@@ -127,13 +135,13 @@ The output goes to `./ste-reports/` (add it to your `.gitignore`):
 You can run the checker without Claude:
 
 ```
-uv run --no-project --quiet skills/ste100/scripts/ste.py check "docs/**/*.md" --threshold 80
+uv run --no-project --quiet skills/ste/scripts/ste.py check "docs/**/*.md" --threshold 80
 ```
 
 Example output:
 
 ```
-STE100 check: 1 file(s), 3 sentences, 30 words
+STE check: 1 file(s), 3 sentences, 30 words
 Score 33.3 / pass mark 80: FAIL
 Clean sentences: tier 60 33%, tier 80 33%, tier 100 33%
 Findings: 8 counted, 3 need review, 1 house style (26.7 counted per 100 words)
@@ -152,7 +160,7 @@ CI score can be higher than an audit score.
 | Subcommand | Use |
 |---|---|
 | `check <inputs...> [--level N] [--threshold N] [--type auto\|proc\|desc] [--json-out P] [--out-dir D]` | Files, folders (`.md` and `.txt`), globs (the script expands them, also in PowerShell) or `-` for stdin. |
-| `report <result.json> [--review R] [--out P] [--open]` | Merge a review and write the HTML. `STE100_NO_OPEN=1` stops `--open`. |
+| `report <result.json> [--review R] [--out P] [--open]` | Merge a review and write the HTML. `STE_NO_OPEN=1` stops `--open`. |
 | `status`, `default`, `level`, `allow` | The settings, as in the slash commands. |
 | `dict import <pdf>` | Import your dictionary. |
 | `hook` | The SessionStart hook. It prints the style card only when the default style is on. |
@@ -161,8 +169,8 @@ CI score can be higher than an audit score.
 
 | File | Scope |
 |---|---|
-| `.claude/ste100.json` in the project | This project. It has priority. |
-| `~/.config/ste100/config.json` (or `$STE100_CONFIG_DIR/config.json`) | All projects. |
+| `.claude/ste.json` in the project | This project. It has priority. |
+| `~/.config/ste/config.json` (or `$STE_CONFIG_DIR/config.json`) | All projects. |
 
 Keys: `default` (true or false), `level` (0 to 100) and `allow` (a list of
 terms). Without a file, the default style is off and the level is 80.
@@ -174,14 +182,14 @@ commands, commit messages, file contents or quoted text.
 ## Dictionary
 
 Without a dictionary, the checker uses a short curated word list
-(`skills/ste100/assets/words.tsv`, written for this project), and Claude does
+(`skills/ste/assets/words.tsv`, written for this project), and Claude does
 most of the checks for approved words.
 
 For full word checks, request the ASD-STE100 specification (free) from
 [asd-ste100.org](https://www.asd-ste100.org), then import your copy:
 
 ```
-/ste100 dict import "C:\path\to\ASD-STE100-Issue-9.pdf"
+/ste dict import "C:\path\to\ASD-STE100-Issue-9.pdf"
 ```
 
 The import saves `dictionary.json` in your user settings folder, not in the
@@ -201,13 +209,13 @@ uv run --no-project --with pytest pytest -q tests
 ```
 
 To test the PDF import with your own copy of the specification, set
-`STE100_DICT_PDF` to its path and add `--with pdfplumber`. The test checks only
+`STE_DICT_PDF` to its path and add `--with pdfplumber`. The test checks only
 counts and three facts.
 
 Headless end-to-end sessions (real `claude -p` runs, approximately $2 for all 8):
 
 ```
-STE100_E2E=1 uv run --no-project --with pytest --with pytest-xdist pytest -q -rP -n 4 tests/e2e
+STE_E2E=1 uv run --no-project --with pytest --with pytest-xdist pytest -q -rP -n 4 tests/e2e
 ```
 
 Plugin evals, with and without the plugin (the difference shows if the skill

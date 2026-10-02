@@ -1,7 +1,7 @@
 """dict import: the PDF row parser, the lookup and dictionary mode in the checker.
 
 The rows below are handwritten. They copy the table layout of the specification
-only, not its text. The real-PDF test runs only when STE100_DICT_PDF is set, and
+only, not its text. The real-PDF test runs only when STE_DICT_PDF is set, and
 it checks counts and three facts, so no dictionary text is in this repo.
 """
 import json
@@ -52,8 +52,8 @@ def table(entries):
 
 @pytest.fixture
 def cfg(tmp_path, monkeypatch):
-    monkeypatch.setenv("STE100_CONFIG_DIR", str(tmp_path / "cfg"))
-    monkeypatch.setenv("STE100_NO_OPEN", "1")
+    monkeypatch.setenv("STE_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setenv("STE_NO_OPEN", "1")
     monkeypatch.chdir(tmp_path)
     return tmp_path
 
@@ -223,11 +223,11 @@ def test_damaged_dictionary_falls_back(cfg, capsys, caplog):
     assert "curated word list only" in caplog.text
 
 
-@pytest.mark.skipif(not os.environ.get("STE100_DICT_PDF"), reason="set STE100_DICT_PDF to "
+@pytest.mark.skipif(not os.environ.get("STE_DICT_PDF"), reason="set STE_DICT_PDF to "
                     "the path of your own ASD-STE100 Issue 9 PDF")
 def test_real_pdf():
     pytest.importorskip("pdfplumber")
-    entries = d.parse_rows(d.extract_rows(Path(os.environ["STE100_DICT_PDF"])))
+    entries = d.parse_rows(d.extract_rows(Path(os.environ["STE_DICT_PDF"])))
     assert len(entries) >= d.MIN_ENTRIES
     assert 500 <= sum(e["approved"] for e in entries) < len(entries)
     table = d.build_lookup(entries)

@@ -1,14 +1,14 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "ste100",
+  "name": "ste",
   "description": "ASD-STE100 Simplified Technical English writing, auditing and default style for Claude Code.",
   "owner": {
-    "name": "dsnmo",
-    "email": "dnambiar.mamba@gmail.com"
+    "name": "Dnamb",
+    "url": "https://github.com/Dnamb"
   },
   "plugins": [
     {
-      "name": "ste100",
+      "name": "ste",
       "description": "Write, explain and audit text in ASD-STE100 Simplified Technical English, with a scored HTML report and an optional default style.",
       "source": "./",
       "category": "productivity"

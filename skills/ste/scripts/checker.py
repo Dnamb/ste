@@ -1,4 +1,4 @@
-"""STE100 checker: markdown segmentation, STE word count, detectors and score.
+"""STE checker: markdown segmentation, STE word count, detectors and score.
 
 Stdlib only (Python 3.11+). Rule text is paraphrased in references/rules.md,
 which is the single source of truth for rule tiers and methods.
@@ -23,7 +23,7 @@ from typing import NamedTuple
 import dictionary
 from ste_config import PRESETS, enforced_tier, parse_level  # noqa: F401  (re-exported)
 
-log = logging.getLogger("ste100")
+log = logging.getLogger("ste")
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 RULES_PATH = SKILL_DIR / "references" / "rules.md"
@@ -1733,7 +1733,7 @@ def build_result(files: list[str], segments: list[Segment], findings: list[Findi
         sc = score([s for s in segments if s.file == name],
                    [f for f in findings if f.file == name], pass_mark)
         per_file.append({"file": name, **sc})
-    return {"schema": SCHEMA, "tool": "ste100", "version": VERSION, "level": level,
+    return {"schema": SCHEMA, "tool": "ste", "version": VERSION, "level": level,
             "enforced_tier": enforced_tier(level), "pass_mark": pass_mark,
             "doc_type": doc_type, "dictionary": dictionary, "reviewed": reviewed,
             "score": score(segments, findings, pass_mark), "files": per_file,

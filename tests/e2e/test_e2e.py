@@ -1,10 +1,10 @@
 """Headless end-to-end sessions: real `claude -p` runs with the plugin loaded.
 
-These tests cost money and take minutes, so they run only when STE100_E2E=1:
+These tests cost money and take minutes, so they run only when STE_E2E=1:
 
-    STE100_E2E=1 uv run --no-project --with pytest --with pytest-xdist pytest -q -rP -n 4 tests/e2e
+    STE_E2E=1 uv run --no-project --with pytest --with pytest-xdist pytest -q -rP -n 4 tests/e2e
 
-Each session runs in a temporary folder with its own STE100_CONFIG_DIR, and
+Each session runs in a temporary folder with its own STE_CONFIG_DIR, and
 ``--setting-sources project,local`` keeps the user's own plugins and CLAUDE.md out.
 The raw stream-json of each session is saved next to its folder for debugging.
 """
@@ -24,13 +24,13 @@ from conftest import ROOT, SCRIPTS
 
 import checker
 
-pytestmark = pytest.mark.skipif(os.environ.get("STE100_E2E") != "1",
-                                reason="set STE100_E2E=1 to run real Claude sessions")
+pytestmark = pytest.mark.skipif(os.environ.get("STE_E2E") != "1",
+                                reason="set STE_E2E=1 to run real Claude sessions")
 
 CLAUDE = shutil.which("claude")
 # Skill must be allowed in -p, or the model-invoked skill is denied (slash commands still work).
 TOOLS = ("Skill", "Read", "Glob", "Write", "Bash(uv run *)", "PowerShell(uv run *)")
-BUDGET = os.environ.get("STE100_E2E_BUDGET", "1.50")      # US dollars for each session
+BUDGET = os.environ.get("STE_E2E_BUDGET", "1.50")      # US dollars for each session
 
 
 @dataclass
@@ -51,7 +51,9 @@ class Run:
         return {p["name"] for p in init.get("plugins", []) if p.get("path") != "builtin"}
 
     def skill_fired(self) -> bool:
-        return any(t["name"] == "Skill" and "ste100" in json.dumps(t.get("input", {}))
+        # "ste" or "ste:ste"; a substring test would also match other skills ("steward").
+        return any(t["name"] == "Skill"
+                   and str(t.get("input", {}).get("skill", "")).split(":")[-1] == "ste"
                    and t["id"] not in self.denied for t in self.tools)
 
 
@@ -70,7 +72,7 @@ def claude(prompt: str, cwd: Path, *, plugin: bool = True, tools: tuple[str, ...
         cmd += ["--resume", resume]
     if tools:
         cmd += ["--allowedTools", *tools]
-    env = {**os.environ, "STE100_CONFIG_DIR": str(cwd.parent / "cfg"), "STE100_NO_OPEN": "1"}
+    env = {**os.environ, "STE_CONFIG_DIR": str(cwd.parent / "cfg"), "STE_NO_OPEN": "1"}
     p = subprocess.run(cmd, input=prompt, cwd=cwd, env=env, capture_output=True, text=True,
                        encoding="utf-8", errors="replace", timeout=1200)
     (cwd.parent / f"{label}.jsonl").write_text(p.stdout + "\n---stderr---\n" + p.stderr,
@@ -100,7 +102,7 @@ def findings_per_100_words(text: str) -> float:
 
 
 def hook_output(cfg: Path, cwd: Path) -> str:
-    env = {**os.environ, "STE100_CONFIG_DIR": str(cfg), "CLAUDE_PROJECT_DIR": str(cwd)}
+    env = {**os.environ, "STE_CONFIG_DIR": str(cfg), "CLAUDE_PROJECT_DIR": str(cwd)}
     return subprocess.run([sys.executable, str(SCRIPTS / "ste.py"), "hook"], env=env, cwd=cwd,
                           capture_output=True, text=True, stdin=subprocess.DEVNULL).stdout
 
@@ -150,8 +152,8 @@ comment field.
 
 
 def test_e1_explain_slash_command(cwd):
-    run = claude("/ste100 explain how a fuse protects a circuit", cwd, label="e1")
-    assert run.plugins() == {"ste100"}, "other user plugins leaked into the session"
+    run = claude("/ste explain how a fuse protects a circuit", cwd, label="e1")
+    assert run.plugins() == {"ste"}, "other user plugins leaked into the session"
     assert run.hook_stdout() == "", "the hook must be silent when the default style is off"
     score = ste_score(run.text)
     print(f"E1 score {score}")
@@ -177,7 +179,7 @@ def test_e2_natural_prompt_with_and_without_plugin(cwd, tmp_path):
 
 def test_e3_rewrite_keeps_literals(cwd):
     (cwd / "guide.md").write_text(GUIDE, encoding="utf-8")
-    run = claude("/ste100 rewrite guide.md", cwd, label="e3")
+    run = claude("/ste rewrite guide.md", cwd, label="e3")
     out = cwd / "guide.ste.md"
     assert out.is_file(), run.text[-1500:]
     text = out.read_text(encoding="utf-8")
@@ -194,7 +196,7 @@ def test_e3_rewrite_keeps_literals(cwd):
 
 def test_e4_audit_file(cwd):
     (cwd / "notes.md").write_text(NOTES, encoding="utf-8")
-    run = claude("/ste100 audit notes.md", cwd, label="e4")
+    run = claude("/ste audit notes.md", cwd, label="e4")
     html = reports(cwd, "*.html")
     merged = reports(cwd, "*.reviewed.json")
     assert html and merged, run.text[-1500:]
@@ -214,7 +216,7 @@ def test_e5_quoted_glob_and_threshold(cwd):
     (docs / "b.md").write_text("You should utilize the valve prior to commencing.\n",
                                encoding="utf-8")
     (docs / "c.txt").write_text("Not matched by the glob.\n", encoding="utf-8")
-    run = claude('/ste100 audit "docs/*.md" --threshold 50', cwd, label="e5")
+    run = claude('/ste audit "docs/*.md" --threshold 50', cwd, label="e5")
     results = [p for p in reports(cwd, "*.json") if not p.name.endswith(".review.json")]
     assert results, run.text[-1500:]
     result = json.loads(results[-1].read_text(encoding="utf-8"))
@@ -223,10 +225,10 @@ def test_e5_quoted_glob_and_threshold(cwd):
 
 
 def test_e6_audit_last_reply(cwd):
-    first = claude("/ste100 explain what a circuit breaker does, in about 120 words", cwd,
+    first = claude("/ste explain what a circuit breaker does, in about 120 words", cwd,
                    persist=True, label="e6-explain")
     assert first.session
-    run = claude("/ste100 audit last", cwd, resume=first.session, persist=True, label="e6-audit")
+    run = claude("/ste audit last", cwd, resume=first.session, persist=True, label="e6-audit")
     last = cwd / "ste-reports" / "input" / "last-reply.md"
     assert last.is_file(), run.text[-1500:]
     words = set(first.text.lower().split())
@@ -240,7 +242,7 @@ def test_e6_audit_last_reply(cwd):
 
 def test_e7_default_on_then_off(cwd):
     cfg = cwd.parent / "cfg"
-    claude("/ste100 default on standard", cwd, label="e7-on")
+    claude("/ste default on standard", cwd, label="e7-on")
     config = json.loads((cfg / "config.json").read_text(encoding="utf-8"))
     assert config["default"] is True and config["level"] == 80
     assert "additionalContext" in hook_output(cfg, cwd)
@@ -253,7 +255,7 @@ def test_e7_default_on_then_off(cwd):
     assert not fresh.skill_fired(), "the hook alone must set the style"
     assert score >= 75
 
-    claude("/ste100 default off", cwd, label="e7-off")
+    claude("/ste default off", cwd, label="e7-off")
     config = json.loads((cfg / "config.json").read_text(encoding="utf-8"))
     assert config["default"] is False
     assert hook_output(cfg, cwd).strip() == ""
@@ -261,10 +263,10 @@ def test_e7_default_on_then_off(cwd):
 
 def test_e8_project_override_and_allowed_tools(cwd):
     (cwd / ".claude").mkdir()
-    (cwd / ".claude" / "ste100.json").write_text('{"level": 100, "allow": ["gateway"]}',
+    (cwd / ".claude" / "ste.json").write_text('{"level": 100, "allow": ["gateway"]}',
                                                  encoding="utf-8")
     # No --allowedTools: the shell grant must come from the skill's allowed-tools.
-    run = claude("/ste100 status", cwd, tools=None, label="e8")
+    run = claude("/ste status", cwd, tools=None, label="e8")
     ran = [t for t in run.tools if t["name"] in ("Bash", "PowerShell")]
     assert ran, f"the skill did not run the CLI: {run.text[-800:]}"
     assert "100" in run.text and "gateway" in run.text

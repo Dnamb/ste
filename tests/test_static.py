@@ -7,7 +7,7 @@ import ste
 import ste_config
 from conftest import ROOT
 
-SKILL = ROOT / "skills" / "ste100"
+SKILL = ROOT / "skills" / "ste"
 SKILL_MD = (SKILL / "SKILL.md").read_text(encoding="utf-8")
 
 
@@ -30,7 +30,7 @@ def frontmatter(text: str) -> dict[str, str | list[str]]:
 
 def test_frontmatter():
     fm = frontmatter(SKILL_MD)
-    assert fm["name"] == "ste100"
+    assert fm["name"] == "ste"
     assert 200 < len(fm["description"]) < 1536
     assert fm["description"].startswith("ASD-STE100 Simplified Technical English")
     assert fm["argument-hint"].startswith("[explain|rewrite|audit|")
@@ -84,5 +84,5 @@ def test_manifests_agree():
     market = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
     assert plugin["version"] == checker.VERSION
     [entry] = market["plugins"]
-    assert entry["name"] == plugin["name"] == "ste100" and entry["source"] == "./"
+    assert entry["name"] == plugin["name"] == "ste" and entry["source"] == "./"
     assert "hooks" not in plugin                    # hooks/hooks.json loads by itself

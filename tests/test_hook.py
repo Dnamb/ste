@@ -22,9 +22,9 @@ def env(tmp_path, monkeypatch):
     """A clean global config dir and project dir, for in-process and subprocess runs."""
     cfg, proj = tmp_path / "cfg", tmp_path / "proj"
     proj.mkdir()
-    monkeypatch.setenv("STE100_CONFIG_DIR", str(cfg))
+    monkeypatch.setenv("STE_CONFIG_DIR", str(cfg))
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(proj))
-    monkeypatch.setenv("STE100_NO_OPEN", "1")
+    monkeypatch.setenv("STE_NO_OPEN", "1")
     monkeypatch.chdir(proj)
     return {"cfg": cfg, "proj": proj}
 
@@ -66,7 +66,7 @@ def test_card_is_ascii_and_short(env):
     text = context(hook())
     assert RULE_100 in text and text.isascii()
     assert len(text) < ste_config.MAX_CONTEXT
-    assert "more (see /ste100 status)" in text and text.rstrip().endswith("cause injury.\"")
+    assert "more (see /ste status)" in text and text.rstrip().endswith("cause injury.\"")
 
 
 def test_project_overrides_global(env):
@@ -77,7 +77,7 @@ def test_project_overrides_global(env):
     ste.main(["level", "strict", "--project"])
     text = context(hook())
     assert "from the project settings" in text and RULE_100 in text
-    assert json.loads((env["proj"] / ".claude" / "ste100.json").read_text()) == {
+    assert json.loads((env["proj"] / ".claude" / "ste.json").read_text()) == {
         "default": True, "level": 100}
 
 
@@ -162,7 +162,7 @@ def test_status_sources(env, capsys):
 
 def test_unknown_key_is_a_warning(env, capsys):
     (env["proj"] / ".claude").mkdir()
-    (env["proj"] / ".claude" / "ste100.json").write_text('{"levle": 60}', encoding="utf-8")
+    (env["proj"] / ".claude" / "ste.json").write_text('{"levle": 60}', encoding="utf-8")
     assert ste.main(["status"]) == 0
     assert 'unknown key "levle"' in capsys.readouterr().out
 

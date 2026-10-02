@@ -325,7 +325,7 @@ def title_block(r: dict, name: str, created: str) -> str:
     cells = [("Title", name, "wide"), ("Specification", "ASD-STE100 Issue 9 (rules paraphrased)", ""),
              ("Level", level_name(r["level"]), ""),
              ("Score", f"{sc['score']:.1f} (pass mark {sc['pass_mark']})", ""),
-             ("Date", created, ""), ("Tool", f"ste100 {r.get('version', '')}", ""),
+             ("Date", created, ""), ("Tool", f"ste {r.get('version', '')}", ""),
              ("Words checked by", "imported dictionary" if r.get("dictionary") == "imported"
               else "curated list", ""),
              ("Review", "yes" if r.get("reviewed") else "no", ""), ("Sheet", "1 of 1", "")]
@@ -358,7 +358,7 @@ def render(r: dict) -> str:
     created = r.get("created") or datetime.now().isoformat(timespec="seconds")
     page = Template(TEMPLATE.read_text(encoding="utf-8"))
     return page.substitute(
-        doc_title=e(f"STE100 audit: {name}"), name=e(name),
+        doc_title=e(f"STE audit: {name}"), name=e(name),
         panel_a=panel_summary(r, segs, fs), panel_b=panel_sentences(segs, fs, r.get("rewrites", [])),
         panel_c=panel_rules(fs, enforced), panel_d=panel_words(fs),
         panel_e=panel_limits(r, segs, fs), panel_f=panel_files(r),

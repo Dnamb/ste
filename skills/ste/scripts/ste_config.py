@@ -4,8 +4,8 @@ The hook imports only this module, so a problem in the checker can never
 break a session start.
 
 Settings (the first file that has a key wins; ``allow`` lists are merged):
-  1. project: ``<project>/.claude/ste100.json``
-  2. global:  ``$STE100_CONFIG_DIR/config.json``, else ``~/.config/ste100/config.json``
+  1. project: ``<project>/.claude/ste.json``
+  2. global:  ``$STE_CONFIG_DIR/config.json``, else ``~/.config/ste/config.json``
   3. built-in: default off, level 80, no allow terms
 """
 from __future__ import annotations
@@ -59,8 +59,8 @@ def level_name(level: int) -> str:
 # --------------------------------------------------------------------------
 
 def config_dir() -> Path:
-    env = os.environ.get("STE100_CONFIG_DIR")
-    return Path(env) if env else Path.home() / ".config" / "ste100"
+    env = os.environ.get("STE_CONFIG_DIR")
+    return Path(env) if env else Path.home() / ".config" / "ste"
 
 
 def global_path() -> Path:
@@ -72,7 +72,7 @@ def project_dir(explicit: str | None = None) -> Path:
 
 
 def project_path(project: Path) -> Path:
-    return project / ".claude" / "ste100.json"
+    return project / ".claude" / "ste.json"
 
 
 def _validate(data: object, path: Path) -> dict:
@@ -176,12 +176,12 @@ def hook_context(project: Path) -> str:
     if cfg["errors"] or not cfg["default"]:
         return ""
     level = cfg["level"]
-    head = (f"STE100 default style: on, level {level_name(level)} (from the "
+    head = (f"STE default style: on, level {level_name(level)} (from the "
             f"{cfg['source']['default']} settings). Write prose replies in ASD-STE100 "
             "Simplified Technical English with the rules below. Apply them only to prose "
             "(explanations, answers, summaries, procedures). Never change code, commands, "
             "file contents, commit messages, identifiers, paths, URLs, numbers, error text or "
-            "quoted text. Do not say that the style is on. If the user sets /ste100 level or "
+            "quoted text. Do not say that the style is on. If the user sets /ste level or "
             "asks you to stop STE, do that for the rest of the session.")
     card = style_card(level)
     terms, room = [], MAX_CONTEXT - len(head) - len(card) - 120
@@ -192,7 +192,7 @@ def hook_context(project: Path) -> str:
     if terms:
         more = len(cfg["allow"]) - len(terms)
         head += (" Project terms (use them as technical nouns): " + ", ".join(terms)
-                 + (f", and {more} more (see /ste100 status)." if more else "."))
+                 + (f", and {more} more (see /ste status)." if more else "."))
     return f"{head}\n\n{card}"
 
 
