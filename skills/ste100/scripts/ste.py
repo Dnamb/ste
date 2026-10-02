@@ -1,4 +1,4 @@
-"""ste100 command line: check, report, status, default, level, allow, hook.
+"""ste100 command line: check, report, status, default, level, allow, dict, hook.
 
 Run it with ``uv run --no-project --quiet ste.py <command> ...`` (stdlib only).
 Exit codes: 0 = pass (or success), 1 = the score is below the pass mark, 2 = usage
@@ -26,6 +26,7 @@ if __name__ == "__main__" and sys.argv[1:2] == ["hook"]:
     sys.exit(ste_config.hook())
 
 import checker  # noqa: E402
+import dictionary  # noqa: E402
 
 log = logging.getLogger("ste100")
 
@@ -195,7 +196,7 @@ def cmd_check(a: argparse.Namespace) -> int:
         log.warning("%s (this file is ignored)", err)
     level = a.level if a.level is not None else cfg["level"]
     result = checker.check_documents(docs, level=level, pass_mark=a.threshold, doc_type=a.type,
-                                     allow=cfg["allow"])
+                                     allow=cfg["allow"], table=load_table())
     result["created"] = datetime.now().isoformat(timespec="seconds")
     out = Path(a.json_out) if a.json_out else (
         Path(a.out_dir) / f"{_slug([n for n, _ in docs])}-{datetime.now():%Y%m%d-%H%M%S}.json")
@@ -204,14 +205,25 @@ def cmd_check(a: argparse.Namespace) -> int:
     return 0 if result["score"]["passed"] else 1
 
 
+def load_table() -> dictionary.Lookup | None:
+    """The imported dictionary, or None. A damaged file gives a warning, not an error."""
+    try:
+        data = dictionary.load()
+    except ValueError as exc:
+        log.warning("%s. The check uses the curated word list only.", exc)
+        return None
+    return dictionary.build_lookup(data["entries"]) if data else None
+
+
 def cmd_report(a: argparse.Namespace) -> int:
     import report  # only the report command needs the template
 
     src = Path(a.result)
     result = load_json(src)
     if a.review:
+        table = load_table() if result.get("dictionary") == "imported" else None
         try:
-            result = checker.apply_review(result, load_json(Path(a.review)))
+            result = checker.apply_review(result, load_json(Path(a.review)), table)
         except ValueError as exc:
             raise InputError(str(exc)) from exc
         merged = src.with_name(src.stem + ".reviewed.json")
@@ -257,6 +269,7 @@ def cmd_status(a: argparse.Namespace) -> int:
         f"  level: {ste_config.level_name(level)}, rules up to tier "
         f"{ste_config.enforced_tier(level)} (from {src['level']})",
         f"  allow: {', '.join(cfg['allow']) or '(none)'}",
+        f"  dictionary: {_dict_status()}",
         f"  global settings: {where('global')}",
         f"  project settings: {where('project')}",
     ]
@@ -265,6 +278,43 @@ def cmd_status(a: argparse.Namespace) -> int:
     lines += [f"warning: {w}" for w in cfg["warnings"]]
     print("\n".join(lines))
     return 2 if cfg["errors"] else 0
+
+
+def _dict_status() -> str:
+    try:
+        data = dictionary.load()
+    except ValueError as exc:
+        return f"damaged ({exc})"
+    if not data:
+        return "none (curated word list only; see /ste100 dict import)"
+    n = len(data["entries"])
+    return (f"{n} entries from {data.get('source', '?')}, imported "
+            f"{str(data.get('created', '?'))[:10]} ({dictionary.dict_path()})")
+
+
+def cmd_dict(a: argparse.Namespace) -> int:
+    pdf = Path(a.pdf)
+    if not pdf.is_file():
+        raise InputError(f"file not found: {pdf}")
+    try:
+        rows = dictionary.extract_rows(pdf)
+    except ModuleNotFoundError as exc:
+        raise InputError("dict import needs pdfplumber. Run it with: uv run --no-project "
+                         "--quiet --with pdfplumber ste.py dict import <pdf>") from exc
+    except Exception as exc:  # pdfplumber raises many types for a bad PDF
+        raise InputError(f"cannot read {pdf}: {exc}") from exc
+    entries = dictionary.parse_rows(rows)
+    if not entries:
+        raise InputError(f"no dictionary pages in {pdf}. Use the ASD-STE100 specification PDF "
+                         "(Issue 9), from https://www.asd-ste100.org.")
+    if len(entries) < dictionary.MIN_ENTRIES:
+        log.warning("only %d entries: this is probably not the full dictionary", len(entries))
+    path = dictionary.save(entries, pdf)
+    approved = sum(1 for e in entries if e["approved"])
+    print(f"Saved: {len(entries)} entries ({approved} approved, {len(entries) - approved} not "
+          f"approved) in {path}. Checks now use the dictionary. This file is for your use "
+          "only: do not share or commit it.")
+    return 0
 
 
 def cmd_default(a: argparse.Namespace) -> int:
@@ -355,6 +405,10 @@ def build_parser() -> argparse.ArgumentParser:
     al.add_argument("action", choices=("add", "rm"))
     al.add_argument("terms", nargs="+")
     al.set_defaults(func=cmd_allow)
+    dc = sub.add_parser("dict", help="import the dictionary from your own ASD-STE100 PDF")
+    dc.add_argument("action", choices=("import",))
+    dc.add_argument("pdf")
+    dc.set_defaults(func=cmd_dict)
     h = sub.add_parser("hook", help="SessionStart hook (prints the style card when on)")
     h.set_defaults(func=lambda a: ste_config.hook())
     return p

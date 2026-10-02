@@ -31,6 +31,16 @@ are in `rules.md` in this folder.
 - If the same technical noun is rejected many times, tell the user that
   `/ste100 allow add "<term>"` stops these findings.
 - A `house` finding is house style. It is never scored. Do not review it.
+- When `dictionary` is `imported`, findings with source `dict` come from the
+  user's own copy of the ASD-STE100 dictionary:
+  - "is not an approved STE word": the dictionary lists the word as not
+    approved. Use the fix. Reject it only for a technical noun or verb.
+  - "is not in the STE dictionary" (`low`): one finding for each word. Most of
+    these words are technical nouns or verbs. Reject those, and confirm the
+    others.
+  - "is not a form of ... that the dictionary lists" (`low`): rule 1.4.
+  - Do not show or copy dictionary entries in the report, the notes or the chat.
+    Give only the approved word and its part of speech.
 
 ## 3. Add the findings that the checker cannot find
 

@@ -20,6 +20,7 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import NamedTuple
 
+import dictionary
 from ste_config import PRESETS, enforced_tier, parse_level  # noqa: F401  (re-exported)
 
 log = logging.getLogger("ste100")
@@ -1050,6 +1051,69 @@ def _words(seg: Segment) -> Iterator[Finding]:
 
 
 # --------------------------------------------------------------------------
+# Imported dictionary (dictionary mode)
+# --------------------------------------------------------------------------
+
+MAX_UNKNOWN = 50                    # unknown-word findings in one check
+_DICT_WORD = re.compile(r"[A-Za-z][a-z]*(?:'s)?")      # camelCase and ACRONYMS are skipped
+
+
+def _dictionary_findings(segments: list[Segment], table: dictionary.Lookup,
+                         allow: Iterable[str]) -> Iterator[Finding]:
+    """Rule 1.1 and 1.4 findings from the user's imported dictionary.
+
+    - a word that is only unapproved: high (low for a verb outside a verb context,
+      because many verbs are also technical nouns);
+    - a form of an approved word that the dictionary does not list: low (rule 1.4);
+    - a word that is not in the dictionary: low, one finding for each word, no more
+      than MAX_UNKNOWN. The reviewer decides if it is a technical noun or verb.
+    Acronyms, names (Title Case inside a sentence), hyphenated words, words with
+    digits and allow terms are skipped.
+    """
+    skip = {t.strip().lower() for t in allow}
+    seen: set[str] = set()
+    unknown = 0
+    for seg in segments:
+        s = seg.masked
+        first_at = _first_token_at(s)
+        for m in TOKEN_RE.finditer(s):
+            tok = m.group(0)
+            if not _DICT_WORD.fullmatch(tok) or len(tok) < 2 or tok.isupper():
+                continue
+            if seg.kind != "title" and m.start() > first_at and tok[0].isupper():
+                continue
+            word = tok[:-2] if tok.lower().endswith("'s") else tok
+            if word.lower() in skip:
+                continue
+            kind, info = dictionary.classify(word, table)
+            if kind == "unapproved":
+                entries = info
+                verb_only = all(e["pos"] == "v" for e in entries)
+                prev = _prev_word(s, m.start())
+                verb_ctx = m.start() == first_at or prev in _VERB_CTX
+                alts = list(dict.fromkeys(a for e in entries for a in e.get("alts", [])))
+                heads = ", ".join(f"{e['word']} ({e['pos']})" for e in entries)
+                yield _f(seg, "1.1", m.start(), m.start() + len(word),
+                         f"\"{word}\" is not an approved STE word (dictionary: {heads}).",
+                         " or ".join(alts) or "Use an approved word.",
+                         conf="low" if verb_only and not verb_ctx else "high",
+                         source="dict")
+            elif kind == "form" and not word.lower().endswith("ing"):     # -ing: rule 3.5
+                yield _f(seg, "1.4", m.start(), m.start() + len(word),
+                         f"\"{word}\" is not a form of {str(info).upper()} that the "
+                         "dictionary lists.", f"Use a listed form of {str(info).upper()}.",
+                         conf="low", source="dict")
+            elif kind == "unknown" and word.lower() not in seen and unknown < MAX_UNKNOWN:
+                seen.add(word.lower())
+                unknown += 1
+                yield _f(seg, "1.1", m.start(), m.start() + len(word),
+                         f"\"{word}\" is not in the STE dictionary. Reject this finding if it "
+                         "is a technical noun or verb of the subject.",
+                         "Use an approved word, or add the term to the allow list.",
+                         conf="low", source="dict")
+
+
+# --------------------------------------------------------------------------
 # Heuristic detectors
 # --------------------------------------------------------------------------
 # ponytail: no POS tagger. These detectors use word lists and word order, so most
@@ -1421,8 +1485,11 @@ def _allow_regex(allow: Iterable[str]) -> re.Pattern[str] | None:
     return re.compile(rf"(?<![\w'-])(?:{body})(?:s|es|d|ed|ing)?(?![\w'-])", re.I)
 
 
-def analyze(segments: list[Segment], allow: Iterable[str] = ()) -> list[Finding]:
+def analyze(segments: list[Segment], allow: Iterable[str] = (),
+            table: dictionary.Lookup | None = None) -> list[Finding]:
     """Run every detector. Returns findings in document order with ids F1, F2 ...
+
+    ``table`` is the user's imported dictionary (see dictionary.build_lookup).
 
     A finding is dropped when it is inside an allowlist term or inside a
     double-quoted span, or when it overlaps an earlier finding of the same rule.
@@ -1435,6 +1502,8 @@ def analyze(segments: list[Segment], allow: Iterable[str] = ()) -> list[Finding]
             for seg in segments:
                 if seg.kind in reg.kinds:
                     found.extend(reg.fn(seg))
+    if table is not None:            # after the curated words, so their messages win
+        found.extend(_dictionary_findings(segments, table, allow))
 
     allow_rx = _allow_regex(allow)
     order = {s.id: i for i, s in enumerate(segments)}
@@ -1549,8 +1618,9 @@ def _id_and_note(item: object) -> tuple[str, str]:
     return str(item), ""
 
 
-def merge_review(segments: list[Segment], findings: list[Finding],
-                 review: dict) -> tuple[list[Finding], list[dict], list[str], str]:
+def merge_review(segments: list[Segment], findings: list[Finding], review: dict,
+                 allow: Iterable[str] = (), table: dictionary.Lookup | None = None,
+                 ) -> tuple[list[Finding], list[dict], list[str], str]:
     """Apply an LLM review to checker findings.
 
     Returns (findings, rewrites, warnings, notes). ``confirm``/``reject`` take
@@ -1606,7 +1676,8 @@ def merge_review(segments: list[Segment], findings: list[Finding],
         loc = _locate(segments, file, line, original)
         if loc is None:
             warnings.append(f"rewrites #{n}: the original sentence was not found")
-        left = [f"{f.rule}: {f.quote}" for f in analyze(segment_text(text)) if counted(f)]
+        left = [f"{f.rule}: {f.quote}" for f in analyze(segment_text(text), allow, table)
+                if counted(f)]
         rewrites.append({"seg": loc[0].id if loc else "", "file": loc[0].file if loc else file,
                          "line": loc[0].line if loc else line,
                          "original": loc[0].text if loc else original,
@@ -1625,7 +1696,8 @@ _FINDING_FIELDS = {f.name for f in fields(Finding)}
 def build_result(files: list[str], segments: list[Segment], findings: list[Finding], *,
                  level: int, pass_mark: int, doc_type: str = "auto",
                  dictionary: str = "curated", rewrites: Iterable[dict] = (), notes: str = "",
-                 reviewed: bool = False, warnings: Iterable[str] = ()) -> dict:
+                 reviewed: bool = False, warnings: Iterable[str] = (),
+                 allow: Iterable[str] = ()) -> dict:
     """The JSON result that ``check`` writes and ``report`` reads."""
     per_file = []
     for name in files:
@@ -1638,25 +1710,34 @@ def build_result(files: list[str], segments: list[Segment], findings: list[Findi
             "score": score(segments, findings, pass_mark), "files": per_file,
             "segments": [s.to_json() for s in segments],
             "findings": [f.to_json() for f in findings], "rewrites": list(rewrites),
-            "notes": notes, "warnings": list(warnings)}
+            "notes": notes, "warnings": list(warnings), "allow": list(allow)}
 
 
 def check_documents(docs: list[tuple[str, str]], *, level: int = 80,
                     pass_mark: int | None = None, doc_type: str = "auto",
-                    allow: Iterable[str] = ()) -> dict:
-    """Segment, analyze and score (name, text) pairs. Segments from all files are pooled."""
+                    allow: Iterable[str] = (), table: dictionary.Lookup | None = None) -> dict:
+    """Segment, analyze and score (name, text) pairs. Segments from all files are pooled.
+
+    ``table`` turns on dictionary mode (the user's imported dictionary).
+    """
+    allow = list(allow)
     segments: list[Segment] = []
     for name, text in docs:
         segments += segment_text(text, file=name, doc_type=doc_type,
                                  start_id=len(segments) + 1)
-    findings = analyze(segments, allow=allow)
+    findings = analyze(segments, allow=allow, table=table)
     return build_result([n for n, _ in docs], segments, findings, level=level,
                         pass_mark=level if pass_mark is None else pass_mark,
-                        doc_type=doc_type)
+                        doc_type=doc_type, allow=allow,
+                        dictionary="imported" if table is not None else "curated")
 
 
-def apply_review(result: dict, review: dict) -> dict:
-    """Merge a review into a check result and score it again. Raises ValueError."""
+def apply_review(result: dict, review: dict, table: dictionary.Lookup | None = None) -> dict:
+    """Merge a review into a check result and score it again. Raises ValueError.
+
+    Give ``table`` when the check used the imported dictionary, so that the
+    rewrites are checked the same way.
+    """
     if not isinstance(result, dict) or result.get("schema") != SCHEMA:
         raise ValueError(f"the check result is not schema {SCHEMA}")
     try:
@@ -1667,10 +1748,11 @@ def apply_review(result: dict, review: dict) -> dict:
         files = [f["file"] for f in result["files"]]
     except (KeyError, TypeError, AttributeError) as exc:
         raise ValueError(f"the check result is damaged: {exc}") from exc
-    findings, rewrites, warnings, notes = merge_review(segments, findings, review)
+    allow = list(result.get("allow", []))
+    findings, rewrites, warnings, notes = merge_review(segments, findings, review, allow, table)
     return build_result(files, segments, findings, level=result["level"],
                         pass_mark=result["pass_mark"], doc_type=result.get("doc_type", "auto"),
                         dictionary=result.get("dictionary", "curated"),
                         rewrites=list(result.get("rewrites", [])) + rewrites,
                         notes=notes or result.get("notes", ""), reviewed=True,
-                        warnings=list(result.get("warnings", [])) + warnings)
+                        warnings=list(result.get("warnings", [])) + warnings, allow=allow)
