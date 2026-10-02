@@ -1,0 +1,8 @@
+ste-reports/
+evals/results/
+*.pdf
+dictionary*.json
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/

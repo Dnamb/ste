@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv",
+            "args": ["run", "--no-project", "--quiet", "${CLAUDE_PLUGIN_ROOT}/skills/ste100/scripts/ste.py", "hook"],
+            "timeout": 30,
+            "statusMessage": "Loading STE100 style..."
+          }
+        ]
+      }
+    ]
+  }
+}

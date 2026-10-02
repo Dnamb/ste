@@ -1,0 +1,11 @@
+{
+  "name": "ste100",
+  "version": "0.1.0",
+  "description": "ASD-STE100 Simplified Technical English for Claude Code: write and explain in STE, audit text into a scored HTML report, one strictness level (lite 60 / standard 80 / strict 100), and an optional default reply style.",
+  "author": {
+    "name": "dsnmo",
+    "email": "dnambiar.mamba@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": ["ste", "asd-ste100", "simplified-technical-english", "controlled-language", "technical-writing", "audit"]
+}
