@@ -11,11 +11,12 @@ from __future__ import annotations
 
 import bisect
 import functools
+import math
 import logging
 import re
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import NamedTuple
 
@@ -530,6 +531,7 @@ class Finding:
     source: str = "ste"         # ste | house | review | dict
     status: str = "open"        # open | confirmed | rejected | added
     id: str = ""
+    note: str = ""              # review reason or comment
 
     def to_json(self) -> dict[str, object]:
         return asdict(self)
@@ -1457,3 +1459,231 @@ def analyze(segments: list[Segment], allow: Iterable[str] = ()) -> list[Finding]
         f.id = f"F{len(out) + 1}"
         out.append(f)
     return out
+
+
+# --------------------------------------------------------------------------
+# Levels and score
+# --------------------------------------------------------------------------
+
+PRESETS = {"lite": 60, "standard": 80, "strict": 100}
+BANDS = ((60, 60), (80, 20), (100, 20))     # (tier, points)
+SCHEMA = 1
+
+
+def parse_level(value: str | int) -> int:
+    """Return a level 0-100 from a number or a preset name. Raises ValueError."""
+    if isinstance(value, str) and value.strip().lower() in PRESETS:
+        return PRESETS[value.strip().lower()]
+    level = int(value)
+    if not 0 <= level <= 100:
+        raise ValueError(f"the level must be 0-100, not {level}")
+    return level
+
+
+def enforced_tier(level: int) -> int:
+    """The highest rule tier that a level enforces: the next preset at or above it."""
+    return next(t for t, _ in BANDS if level <= t)
+
+
+def counted(f: Finding) -> bool:
+    """True if a finding lowers the score (low confidence needs a confirmation)."""
+    if f.source == "house" or f.status == "rejected" or not f.seg:
+        return False
+    return f.status in ("confirmed", "added") or f.conf == "high"
+
+
+def score(segments: list[Segment], findings: list[Finding], pass_mark: int = 80) -> dict:
+    """Banded score: 60 points for tier 60, 20 for tier 80 and 20 for tier 100.
+
+    For each tier t, c_t is the share of scored segments (not titles) with no
+    counted finding of tier <= t, and score = sum(points_t * c_t). So text that
+    is clean in every tier up to preset P scores at least P.
+    """
+    scored = [s for s in segments if s.kind != "title" and s.words > 0]
+    if not scored:
+        return {"score": 100.0, "pass_mark": pass_mark, "passed": True, "no_text": True,
+                "bands": {str(t): 1.0 for t, _ in BANDS}, "segments": 0, "words": 0,
+                "violations": 0, "per_100_words": 0.0}
+    ids = {s.id for s in scored}
+    worst: dict[str, int] = {}
+    n = 0
+    for f in findings:
+        if counted(f) and f.seg in ids:
+            worst[f.seg] = min(worst.get(f.seg, 999), f.tier)
+            n += 1
+    bands = {t: sum(1 for s in scored if worst.get(s.id, 999) > t) / len(scored)
+             for t, _ in BANDS}
+    total = sum(points * bands[t] for t, points in BANDS)
+    words = sum(s.words for s in scored)
+    # Round down, so a shown "80.0" never fails a pass mark of 80.
+    shown = math.floor(total * 10 + 1e-9) / 10
+    return {"score": shown, "pass_mark": pass_mark, "passed": shown >= pass_mark,
+            "no_text": False, "bands": {str(t): round(c, 4) for t, c in bands.items()},
+            "segments": len(scored), "words": words, "violations": n,
+            "per_100_words": round(100 * n / words, 2)}
+
+
+# --------------------------------------------------------------------------
+# Review merge
+# --------------------------------------------------------------------------
+
+def _int(value: object) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+
+
+def _locate(segments: list[Segment], file: str, line: int,
+            quote: str) -> tuple[Segment, int, int] | None:
+    """Find ``quote`` in a segment near ``line`` of ``file``, then anywhere in the file.
+
+    Without a quote, the segment nearest to the line is used. Returns None if
+    nothing matches.
+    """
+    cands = [s for s in segments if s.kind != "title" and (not file or s.file == file)]
+    near = sorted((s for s in cands if line and s.line - 2 <= line
+                   <= s.line + s.text.count("\n") + 2), key=lambda s: abs(s.line - line))
+    words = re.sub(r"\s+", " ", quote.translate(_QUOTE_MAP)).strip().split()
+    if not words:
+        return (near[0], 0, len(near[0].text)) if near else None
+    pat = re.compile(r"\s+".join(map(re.escape, words)), re.I)
+    for group in (near, cands):
+        for s in group:
+            m = pat.search(s.text.translate(_QUOTE_MAP))   # same length as s.text
+            if m:
+                return s, m.start(), m.end()
+    return None
+
+
+def _id_and_note(item: object) -> tuple[str, str]:
+    if isinstance(item, dict):
+        return str(item.get("id", "")), str(item.get("reason") or item.get("note") or "")
+    return str(item), ""
+
+
+def merge_review(segments: list[Segment], findings: list[Finding],
+                 review: dict) -> tuple[list[Finding], list[dict], list[str], str]:
+    """Apply an LLM review to checker findings.
+
+    Returns (findings, rewrites, warnings, notes). ``confirm``/``reject`` take
+    finding ids. ``add`` and ``rewrites`` items are anchored by file, line and
+    quote; an ``add`` that does not anchor becomes a document note (not scored).
+    """
+    if not isinstance(review, dict):
+        raise ValueError("the review must be a JSON object")
+    warnings: list[str] = []
+    by_id = {f.id: f for f in findings}
+    for key, status in (("confirm", "confirmed"), ("reject", "rejected")):
+        for item in review.get(key) or []:
+            fid, note = _id_and_note(item)
+            if fid not in by_id:
+                warnings.append(f"{key}: unknown finding id {fid!r}")
+                continue
+            by_id[fid].status, by_id[fid].note = status, note
+
+    rules = load_rules()
+    next_id = 1 + sum(1 for f in findings if f.source == "review")
+    added: list[Finding] = []
+    for n, item in enumerate(review.get("add") or [], 1):
+        rid = str(item.get("rule", "")) if isinstance(item, dict) else ""
+        if rid not in rules or rules[rid].tier is None:
+            warnings.append(f"add #{n}: {rid or item!r} is not a rule that gives findings")
+            continue
+        file, line = str(item.get("file") or ""), _int(item.get("line"))
+        quote = str(item.get("quote") or "")
+        f = Finding(rule=rid, tier=rules[rid].tier or 100, conf="high",
+                    message=str(item.get("message") or rules[rid].text),
+                    fix=str(item.get("fix") or ""), file=file, line=line, quote=quote,
+                    source="review", status="added", id=f"R{next_id}",
+                    note=str(item.get("note") or ""))
+        next_id += 1
+        loc = _locate(segments, file, line, quote)
+        if loc:
+            seg, a, b = loc
+            f.seg, f.file, f.start, f.end = seg.id, seg.file, a, b
+            f.line, f.quote = seg.line + seg.text.count("\n", 0, a), seg.text[a:b]
+        else:
+            warnings.append(f"add #{n} ({rid}): the quote was not found; "
+                            "kept as a document note (not scored)")
+        added.append(f)
+
+    rewrites: list[dict] = []
+    for n, item in enumerate(review.get("rewrites") or [], 1):
+        text = str(item.get("rewrite") or "").strip() if isinstance(item, dict) else ""
+        if not text:
+            warnings.append(f"rewrites #{n}: no rewrite text")
+            continue
+        file, line = str(item.get("file") or ""), _int(item.get("line"))
+        original = str(item.get("original") or "")
+        loc = _locate(segments, file, line, original)
+        if loc is None:
+            warnings.append(f"rewrites #{n}: the original sentence was not found")
+        left = [f"{f.rule}: {f.quote}" for f in analyze(segment_text(text)) if counted(f)]
+        rewrites.append({"seg": loc[0].id if loc else "", "file": loc[0].file if loc else file,
+                         "line": loc[0].line if loc else line,
+                         "original": loc[0].text if loc else original,
+                         "rewrite": text, "rewrite_findings": left})
+    return findings + added, rewrites, warnings, str(review.get("notes") or "")
+
+
+# --------------------------------------------------------------------------
+# Results (schema 1)
+# --------------------------------------------------------------------------
+
+_SEG_FIELDS = {f.name for f in fields(Segment)} - {"masked"}
+_FINDING_FIELDS = {f.name for f in fields(Finding)}
+
+
+def build_result(files: list[str], segments: list[Segment], findings: list[Finding], *,
+                 level: int, pass_mark: int, doc_type: str = "auto",
+                 dictionary: str = "curated", rewrites: Iterable[dict] = (), notes: str = "",
+                 reviewed: bool = False, warnings: Iterable[str] = ()) -> dict:
+    """The JSON result that ``check`` writes and ``report`` reads."""
+    per_file = []
+    for name in files:
+        sc = score([s for s in segments if s.file == name],
+                   [f for f in findings if f.file == name], pass_mark)
+        per_file.append({"file": name, **sc})
+    return {"schema": SCHEMA, "tool": "ste100", "level": level,
+            "enforced_tier": enforced_tier(level), "pass_mark": pass_mark,
+            "doc_type": doc_type, "dictionary": dictionary, "reviewed": reviewed,
+            "score": score(segments, findings, pass_mark), "files": per_file,
+            "segments": [s.to_json() for s in segments],
+            "findings": [f.to_json() for f in findings], "rewrites": list(rewrites),
+            "notes": notes, "warnings": list(warnings)}
+
+
+def check_documents(docs: list[tuple[str, str]], *, level: int = 80,
+                    pass_mark: int | None = None, doc_type: str = "auto",
+                    allow: Iterable[str] = ()) -> dict:
+    """Segment, analyze and score (name, text) pairs. Segments from all files are pooled."""
+    segments: list[Segment] = []
+    for name, text in docs:
+        segments += segment_text(text, file=name, doc_type=doc_type,
+                                 start_id=len(segments) + 1)
+    findings = analyze(segments, allow=allow)
+    return build_result([n for n, _ in docs], segments, findings, level=level,
+                        pass_mark=level if pass_mark is None else pass_mark,
+                        doc_type=doc_type)
+
+
+def apply_review(result: dict, review: dict) -> dict:
+    """Merge a review into a check result and score it again. Raises ValueError."""
+    if not isinstance(result, dict) or result.get("schema") != SCHEMA:
+        raise ValueError(f"the check result is not schema {SCHEMA}")
+    try:
+        segments = [Segment(**{k: v for k, v in s.items() if k in _SEG_FIELDS},
+                            masked=mask(s["text"])) for s in result["segments"]]
+        findings = [Finding(**{k: v for k, v in f.items() if k in _FINDING_FIELDS})
+                    for f in result["findings"]]
+        files = [f["file"] for f in result["files"]]
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise ValueError(f"the check result is damaged: {exc}") from exc
+    findings, rewrites, warnings, notes = merge_review(segments, findings, review)
+    return build_result(files, segments, findings, level=result["level"],
+                        pass_mark=result["pass_mark"], doc_type=result.get("doc_type", "auto"),
+                        dictionary=result.get("dictionary", "curated"),
+                        rewrites=list(result.get("rewrites", [])) + rewrites,
+                        notes=notes or result.get("notes", ""), reviewed=True,
+                        warnings=list(result.get("warnings", [])) + warnings)
