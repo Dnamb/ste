@@ -304,6 +304,10 @@ look consider allow provide mount unscrew assemble disassemble rotate fasten flu
 rinse wipe unplug reboot quit cancel accept approve notify inform explain describe
 convert divide join mix pour ask retry rename deploy locate discard detach bring
 carry hang wrap uninstall
+utilize utilise commence begin obtain employ initiate proceed implement modify submit
+terminate eliminate evaluate establish retain observe maintain request acquire attempt
+indicate assist facilitate accomplish achieve generate produce dispose finish decide
+combine split reduce protect
 """.split())
 
 TOKEN_RE = re.compile(r"\w[\w'.\-/]*\w|\w")

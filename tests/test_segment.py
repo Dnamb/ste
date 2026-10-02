@@ -77,6 +77,10 @@ def test_numbered_description_list_is_desc():
     # A paragraph between two lists makes two lists.
     text = "1. Open the cover.\n\nThe cover is red.\n\n1. The lamp comes on.\n"
     assert [k for k, _ in kinds(text)] == ["proc", "desc", "desc"]
+    # Steps with unapproved verbs are still a procedure.
+    text = ("1. Utilize the wizard.\n2. The restore is started by the operator.\n"
+            "3. Disconnect the cable.\n")
+    assert [k for k, _ in kinds(text)] == ["proc", "proc", "proc"]
 
 
 def test_lead_in_colon_ends_sentence_in_same_block():
