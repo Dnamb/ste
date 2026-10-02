@@ -8,6 +8,6 @@
   },
   "homepage": "https://github.com/Dnamb/ste",
   "repository": "https://github.com/Dnamb/ste",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": ["ste", "asd-ste100", "simplified-technical-english", "controlled-language", "technical-writing", "audit"]
 }
