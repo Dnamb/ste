@@ -135,8 +135,9 @@ level itself.
    - the path of the HTML report.
 
 If you cannot run commands, do the audit in chat: give each finding with its rule
-id, the quote and a fix, then the rewrites. Say that there is no score and no HTML
-report, because the checker did not run.
+id from `${CLAUDE_SKILL_DIR}/references/rules.md` (for example `4.2` or `GR-6`), the
+quote and a fix, then the rewrites. Say that there is no score and no HTML report,
+because the checker did not run.
 
 ## Level mode
 
