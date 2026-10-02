@@ -1,0 +1,5 @@
+schema_version: "1.1"
+name: default-hook-on
+tags: [win, hook]
+context:
+  scaffold_script: setup.sh

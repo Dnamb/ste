@@ -214,8 +214,21 @@ Plugin evals, with and without the plugin (the difference shows if the skill
 helps):
 
 ```
-claude plugin eval . --tag win --scaffold --trust-plugin --runs 2 --max-cost-usd 5 --no-publish
+claude plugin eval . --tag win --scaffold --trust-plugin --runs 2 --max-cost-usd 5 --no-publish --judge-model sonnet
 ```
+
+Use a Sonnet judge. The default Haiku judge gave FAIL votes on replies that
+were correct STE.
+
+Result on 2 Oct 2026 (7 cases, 2 runs for each arm, $2.87): the skill fired in
+all the runs where it must, and did not fire for the coding task. With the
+plugin, 6 of 7 cases passed (score 0.96). The mean difference from no plugin is
++0.08. The largest gains are the default style from the hook (+0.50) and the
+safety procedure (+0.17). When a prompt asks for STE by name, Claude without
+the plugin is already good, so the difference is small there. The value of the
+plugin is the default style, the checker score and the audit report. The
+`strict-style` LLM grader is noisy: when the same judge was called directly, it
+gave PASS to the replies that failed in the eval.
 
 The `audit-report` case needs Bash, which native Windows eval runs cannot get.
 Run it under WSL2 with `--tag wsl --allow-tools Bash Write`.
