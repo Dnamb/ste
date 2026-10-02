@@ -83,7 +83,7 @@ def test_violations_per_100_words():
 
 
 # --------------------------------------------------------------------------
-# Dashboard golden examples (dashboard.png, with its errata corrected)
+# Golden examples (common STE mistakes, corrected)
 # --------------------------------------------------------------------------
 
 BAD = ("It is imperative that the operator ensures the hydraulic reservoir is "

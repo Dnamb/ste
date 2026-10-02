@@ -1,4 +1,4 @@
-"""Render a schema-1 check result as an HTML sheet in the style of dashboard.png.
+"""Render a schema-1 check result as an HTML sheet in the style of an engineering drawing sheet.
 
 Every value from the result goes through ``e()`` (html.escape with quotes). The
 page has no JavaScript and a strict CSP, so text from audited files cannot run.
