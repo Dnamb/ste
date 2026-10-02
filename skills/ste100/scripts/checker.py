@@ -1073,7 +1073,7 @@ _VERB_S = frozenset({v[:-1] + "ies" if re.search(r"[^aeiou]y$", v) else
                      v + ("es" if v.endswith(("s", "x", "z", "ch", "sh")) else "s")
                      for v in IMPERATIVE_VERBS}
                     | set("contains includes requires operates protects reduces causes receives "
-                          "produces generates transmits".split()))
+                          "produces generates transmits comes goes becomes".split()))
 
 
 def _is_adverb(lw: str) -> bool:
@@ -1468,6 +1468,7 @@ def analyze(segments: list[Segment], allow: Iterable[str] = ()) -> list[Finding]
 PRESETS = {"lite": 60, "standard": 80, "strict": 100}
 BANDS = ((60, 60), (80, 20), (100, 20))     # (tier, points)
 SCHEMA = 1
+VERSION = "0.1.0"           # keep in step with .claude-plugin/plugin.json
 
 
 def parse_level(value: str | int) -> int:
@@ -1645,7 +1646,7 @@ def build_result(files: list[str], segments: list[Segment], findings: list[Findi
         sc = score([s for s in segments if s.file == name],
                    [f for f in findings if f.file == name], pass_mark)
         per_file.append({"file": name, **sc})
-    return {"schema": SCHEMA, "tool": "ste100", "level": level,
+    return {"schema": SCHEMA, "tool": "ste100", "version": VERSION, "level": level,
             "enforced_tier": enforced_tier(level), "pass_mark": pass_mark,
             "doc_type": doc_type, "dictionary": dictionary, "reviewed": reviewed,
             "score": score(segments, findings, pass_mark), "files": per_file,
