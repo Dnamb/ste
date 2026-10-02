@@ -442,6 +442,7 @@ def segment_text(text: str, file: str = "<text>", doc_type: str = "auto",
     if doc_type not in ("auto", "proc", "desc"):
         raise ValueError(f"doc_type must be auto, proc or desc, not {doc_type!r}")
     segs: list[Segment] = []
+    steps: list[tuple[int, Segment, bool]] = []     # (block, first sentence, imperative)
     for bi, block in enumerate(split_blocks(text)):
         joined = "\n".join(c for _, c in block.lines)
         starts: list[int] = []
@@ -481,6 +482,24 @@ def segment_text(text: str, file: str = "<text>", doc_type: str = "auto",
             segs.append(Segment(id=f"s{start_id + len(segs)}", file=file, line=line,
                                 block=bi, index=si, kind=kind, text=joined[a:b],
                                 masked=sm, words=count_words(sm)))
+            if block.kind == "num" and si == 0 and kind == "proc":
+                steps.append((bi, segs[-1], is_imperative(sm)))
+
+    # A numbered list is a procedure only if at least half of its items are commands.
+    # If not, it is a numbered description ("1. The element melts.").
+    # ponytail: a list is a run of adjacent numbered blocks, so a nested bullet splits it;
+    # use the list structure from split_blocks if that gives wrong kinds.
+    lists: list[list[tuple[int, Segment, bool]]] = []
+    for step in steps:
+        if lists and step[0] == lists[-1][-1][0] + 1:
+            lists[-1].append(step)
+        else:
+            lists.append([step])
+    for items in lists:
+        if 2 * sum(imp for _, _, imp in items) < len(items):
+            for _, seg, imp in items:
+                if not imp:
+                    seg.kind = "desc"
     return segs
 
 
@@ -1271,6 +1290,9 @@ def _phrasal(seg: Segment) -> Iterator[Finding]:
                      "phrasal verb.", "Use one verb with a clear meaning.", conf="low")
 
 
+_SUBJECTS = frozenset("it this that which who he she".split())
+
+
 @detector("2.1", kinds=SENTENCE_KINDS)
 def _noun_clusters(seg: Segment) -> Iterator[Finding]:
     s = seg.masked
@@ -1287,6 +1309,9 @@ def _noun_clusters(seg: Segment) -> Iterator[Finding]:
                        or any(c.isdigit() for c in w))
         if content and run and ((lw.endswith("ed") and is_participle(lw)) or lw in _VERB_S):
             content = False    # a verb after the nouns ends the noun run
+        if content and not run and lw in _VERB_S and i \
+                and toks[i - 1].group(0).lower() in _SUBJECTS:
+            content = False    # "It protects sensitive parts": a verb, not a noun
         if content and not run and lw in IMPERATIVE_VERBS:
             prev = toks[i - 1].group(0).lower() if i else ""
             if not joined or prev in _VERB_CTX or prev in ("and", "then", "or"):

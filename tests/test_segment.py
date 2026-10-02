@@ -71,6 +71,14 @@ def test_numbered_item_is_proc_and_bullets_by_verb():
                            ("proc", "Remove the dust")]
 
 
+def test_numbered_description_list_is_desc():
+    text = "1. The current goes up.\n2. The element melts.\n3. Replace the fuse.\n"
+    assert [k for k, _ in kinds(text)] == ["desc", "desc", "proc"]
+    # A paragraph between two lists makes two lists.
+    text = "1. Open the cover.\n\nThe cover is red.\n\n1. The lamp comes on.\n"
+    assert [k for k, _ in kinds(text)] == ["proc", "desc", "desc"]
+
+
 def test_lead_in_colon_ends_sentence_in_same_block():
     segs = segment_text("Do these steps:\nOpen the valve. Close it.")
     assert [s.text for s in segs] == ["Do these steps:", "Open the valve.", "Close it."]
