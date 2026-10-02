@@ -20,6 +20,8 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import NamedTuple
 
+from ste_config import PRESETS, enforced_tier, parse_level  # noqa: F401  (re-exported)
+
 log = logging.getLogger("ste100")
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
@@ -1465,25 +1467,9 @@ def analyze(segments: list[Segment], allow: Iterable[str] = ()) -> list[Finding]
 # Levels and score
 # --------------------------------------------------------------------------
 
-PRESETS = {"lite": 60, "standard": 80, "strict": 100}
 BANDS = ((60, 60), (80, 20), (100, 20))     # (tier, points)
 SCHEMA = 1
 VERSION = "0.1.0"           # keep in step with .claude-plugin/plugin.json
-
-
-def parse_level(value: str | int) -> int:
-    """Return a level 0-100 from a number or a preset name. Raises ValueError."""
-    if isinstance(value, str) and value.strip().lower() in PRESETS:
-        return PRESETS[value.strip().lower()]
-    level = int(value)
-    if not 0 <= level <= 100:
-        raise ValueError(f"the level must be 0-100, not {level}")
-    return level
-
-
-def enforced_tier(level: int) -> int:
-    """The highest rule tier that a level enforces: the next preset at or above it."""
-    return next(t for t, _ in BANDS if level <= t)
 
 
 def counted(f: Finding) -> bool:

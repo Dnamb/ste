@@ -1,4 +1,4 @@
-"""ste100 command line: check, report.
+"""ste100 command line: check, report, status, default, level, allow, hook.
 
 Run it with ``uv run --no-project --quiet ste.py <command> ...`` (stdlib only).
 Exit codes: 0 = pass (or success), 1 = the score is below the pass mark, 2 = usage
@@ -18,6 +18,12 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import ste_config  # noqa: E402  (standard library only)
+
+if __name__ == "__main__" and sys.argv[1:2] == ["hook"]:
+    # The SessionStart hook must not depend on the checker, so it exits here.
+    sys.exit(ste_config.hook())
 
 import checker  # noqa: E402
 
@@ -184,8 +190,12 @@ def open_in_browser(path: Path) -> None:
 def cmd_check(a: argparse.Namespace) -> int:
     paths = expand_inputs(a.inputs)
     docs = read_inputs(paths)
-    level = a.level if a.level is not None else 80
-    result = checker.check_documents(docs, level=level, pass_mark=a.threshold, doc_type=a.type)
+    cfg = ste_config.effective(ste_config.project_dir(a.project_dir))
+    for err in cfg["errors"]:
+        log.warning("%s (this file is ignored)", err)
+    level = a.level if a.level is not None else cfg["level"]
+    result = checker.check_documents(docs, level=level, pass_mark=a.threshold, doc_type=a.type,
+                                     allow=cfg["allow"])
     result["created"] = datetime.now().isoformat(timespec="seconds")
     out = Path(a.json_out) if a.json_out else (
         Path(a.out_dir) / f"{_slug([n for n, _ in docs])}-{datetime.now():%Y%m%d-%H%M%S}.json")
@@ -218,6 +228,85 @@ def cmd_report(a: argparse.Namespace) -> int:
     return 0 if result["score"]["passed"] else 1
 
 
+def _settings_file(a: argparse.Namespace) -> Path:
+    project = ste_config.project_dir(a.project_dir)
+    return ste_config.project_path(project) if a.project else ste_config.global_path()
+
+
+def _save(a: argparse.Namespace, **changes: object) -> Path:
+    path = _settings_file(a)
+    try:
+        ste_config.update_config(path, **changes)
+    except ste_config.ConfigError as exc:
+        raise InputError(f"{exc}. Fix or delete the file, then try again.") from exc
+    return path
+
+
+def cmd_status(a: argparse.Namespace) -> int:
+    project = ste_config.project_dir(a.project_dir)
+    cfg = ste_config.effective(project)
+    src, level = cfg["source"], cfg["level"]
+
+    def where(scope: str) -> str:
+        path = Path(cfg["files"][scope])
+        return f"{path}" + ("" if path.exists() else " (not found)")
+
+    lines = [
+        f"STE100 settings for {project}",
+        f"  default style: {'on' if cfg['default'] else 'off'} (from {src['default']})",
+        f"  level: {ste_config.level_name(level)}, rules up to tier "
+        f"{ste_config.enforced_tier(level)} (from {src['level']})",
+        f"  allow: {', '.join(cfg['allow']) or '(none)'}",
+        f"  global settings: {where('global')}",
+        f"  project settings: {where('project')}",
+    ]
+    lines += [f"error: {x}. This file is ignored and the hook is off until you fix it."
+              for x in cfg["errors"]]
+    lines += [f"warning: {w}" for w in cfg["warnings"]]
+    print("\n".join(lines))
+    return 2 if cfg["errors"] else 0
+
+
+def cmd_default(a: argparse.Namespace) -> int:
+    changes: dict[str, object] = {"default": a.state == "on"}
+    if a.level is not None:
+        changes["level"] = a.level
+    path = _save(a, **changes)
+    print(f"Saved: default style {a.state}"
+          + (f", level {ste_config.level_name(a.level)}" if a.level is not None else "")
+          + f" in {path}. The hook uses it from the next session start or /clear.")
+    return cmd_status(a)
+
+
+def cmd_level(a: argparse.Namespace) -> int:
+    path = _save(a, level=a.value)
+    print(f"Saved: level {ste_config.level_name(a.value)} in {path}.")
+    return cmd_status(a)
+
+
+def cmd_allow(a: argparse.Namespace) -> int:
+    path = _settings_file(a)
+    try:
+        terms: list[str] = ste_config.read_config(path).get("allow", [])
+    except ste_config.ConfigError as exc:
+        raise InputError(f"{exc}. Fix or delete the file, then try again.") from exc
+    known = {t.lower() for t in terms}
+    asked = [t.strip() for t in a.terms if t.strip()]
+    if a.action == "add":
+        for term in asked:
+            if term.lower() not in known:
+                terms.append(term)
+                known.add(term.lower())
+    else:
+        drop = {t.lower() for t in asked}
+        for term in sorted(drop - known):
+            log.warning("not in the allow list: %s", term)
+        terms = [t for t in terms if t.lower() not in drop]
+    _save(a, allow=terms)
+    print(f"Saved: allow list in {path}: {', '.join(terms) or '(empty)'}")
+    return 0
+
+
 def _level(value: str) -> int:
     try:
         return checker.parse_level(value)
@@ -228,10 +317,17 @@ def _level(value: str) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="ste.py", description="ASD-STE100 checker and report.")
     sub = p.add_subparsers(dest="command", required=True)
+    proj = argparse.ArgumentParser(add_help=False)
+    proj.add_argument("--project-dir", help="project folder (default: $CLAUDE_PROJECT_DIR, "
+                                            "else the current folder)")
+    scope = argparse.ArgumentParser(add_help=False, parents=[proj])
+    scope.add_argument("--project", action="store_true",
+                       help="save in <project>/.claude/ste100.json, not in the global settings")
 
-    c = sub.add_parser("check", help="check files, folders, globs or stdin (-)")
+    c = sub.add_parser("check", parents=[proj], help="check files, folders, globs or stdin (-)")
     c.add_argument("inputs", nargs="+")
-    c.add_argument("--level", type=_level, help="0-100 or lite|standard|strict (default 80)")
+    c.add_argument("--level", type=_level,
+                   help="0-100 or lite|standard|strict (default: the settings, else 80)")
     c.add_argument("--threshold", type=_level, help="pass mark for this run (default: the level)")
     c.add_argument("--type", choices=("auto", "proc", "desc"), default="auto")
     c.add_argument("--json-out", help="where to write the result JSON")
@@ -244,6 +340,23 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--out", help="HTML path (default: next to the result)")
     r.add_argument("--open", action="store_true", help="open the report in the browser")
     r.set_defaults(func=cmd_report)
+
+    s = sub.add_parser("status", parents=[proj], help="show the settings and where they come from")
+    s.set_defaults(func=cmd_status)
+    d = sub.add_parser("default", parents=[scope], help="make STE the default reply style, or not")
+    d.add_argument("state", choices=("on", "off"))
+    d.add_argument("level", nargs="?", type=_level, help="also save this level")
+    d.set_defaults(func=cmd_default)
+    lv = sub.add_parser("level", parents=[scope], help="save the level for audits and the hook")
+    lv.add_argument("value", type=_level)
+    lv.set_defaults(func=cmd_level)
+    al = sub.add_parser("allow", parents=[scope],
+                        help="add or remove project terms that are never flagged")
+    al.add_argument("action", choices=("add", "rm"))
+    al.add_argument("terms", nargs="+")
+    al.set_defaults(func=cmd_allow)
+    h = sub.add_parser("hook", help="SessionStart hook (prints the style card when on)")
+    h.set_defaults(func=lambda a: ste_config.hook())
     return p
 
 

@@ -11,9 +11,9 @@ from datetime import datetime
 from string import Template
 
 from checker import BANDS, SKILL_DIR, Finding, Segment, counted, load_rules, mask
+from ste_config import level_name
 
 TEMPLATE = SKILL_DIR / "assets" / "report.html"
-PRESET_NAMES = {60: "lite", 80: "standard", 100: "strict"}
 KIND_NAMES = {"proc": "Procedural sentence", "desc": "Descriptive sentence",
               "warning": "Warning", "caution": "Caution", "note": "Note",
               "title": "Title", "cell": "Table cell"}
@@ -45,10 +45,6 @@ def state(f: Finding, enforced: int) -> str:
     if counted(f):
         return "beyond" if f.tier > enforced else "counted"
     return "open"
-
-
-def _level_name(level: int) -> str:
-    return f"{level} ({PRESET_NAMES[level]})" if level in PRESET_NAMES else str(level)
 
 
 def _pct(value: float, scale: float) -> str:
@@ -95,7 +91,7 @@ def panel_summary(r: dict, segs: list[Segment], fs: list[tuple[Finding, str]]) -
     no_text = '<p class="muted">The input has no text to score.</p>' if sc["no_text"] else ""
     body = f"""
 <div class="hero"><span class="value">{sc['score']:.1f}</span><span class="of">/ 100</span>{stamp}</div>
-<p class="passmark">Pass mark <b>{sc['pass_mark']}</b> &middot; level <b>{e(_level_name(r['level']))}</b>
+<p class="passmark">Pass mark <b>{sc['pass_mark']}</b> &middot; level <b>{e(level_name(r['level']))}</b>
  &middot; rules enforced up to tier {r['enforced_tier']}</p>{no_text}
 <dl class="tiles">
  <div><dt>Sentences</dt><dd>{sc['segments']}</dd></div>
@@ -284,8 +280,8 @@ def panel_limits(r: dict, segs: list[Segment], fs: list[tuple[Finding, str]]) ->
     bands = []
     for tier, points in BANDS:
         share = float(r["score"]["bands"][str(tier)])
-        bands.append(f'<div class="gauge"><div class="ghead"><b>Tier {tier} '
-                     f'({PRESET_NAMES[tier]})</b><span>{share * 100:.0f}% of sentences clean'
+        bands.append(f'<div class="gauge"><div class="ghead"><b>Tier {e(level_name(tier))}'
+                     f'</b><span>{share * 100:.0f}% of sentences clean'
                      f'</span></div>{_meter(share, 1.0, "band")}<div class="gfoot">'
                      f'<span>{share * points:.1f} of {points} points</span></div></div>')
     return _panel("E", "Limits and score bands", "max values", (
@@ -327,7 +323,7 @@ def panel_files(r: dict) -> str:
 def title_block(r: dict, name: str, created: str) -> str:
     sc = r["score"]
     cells = [("Title", name, "wide"), ("Specification", "ASD-STE100 Issue 9 (rules paraphrased)", ""),
-             ("Level", _level_name(r["level"]), ""),
+             ("Level", level_name(r["level"]), ""),
              ("Score", f"{sc['score']:.1f} (pass mark {sc['pass_mark']})", ""),
              ("Date", created, ""), ("Tool", f"ste100 {r.get('version', '')}", ""),
              ("Words checked by", "imported dictionary" if r.get("dictionary") == "imported"
