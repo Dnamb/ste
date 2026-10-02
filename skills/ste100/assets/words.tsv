@@ -1,0 +1,220 @@
+# Curated STE word substitutions. This is NOT the ASD-STE100 dictionary: it is a short list of common words, checked against Issue 9.
+# Columns (tab separated): word, pos, alternative, rule, tier, source (ste|house), ctx (any|v), conf (high|low), note.
+# source=house rows are advisory house style and are never scored.
+word	pos	alternative	rule	tier	source	ctx	conf	note
+ensure	v	MAKE SURE (that)	1.1	60	ste	any	high
+verify	v	MAKE SURE (that), EXAMINE	1.1	60	ste	any	high
+utilize	v	USE	1.1	60	ste	any	high
+utilise	v	USE	1.1	60	ste	any	high	British spelling of "utilize"
+perform	v	DO	1.1	60	ste	any	high
+provide	v	GIVE, SUPPLY	1.1	60	ste	any	high	"provided that" -> IF
+allow	v	LET	1.1	60	ste	any	high
+enable	v	LET	1.1	60	ste	any	high	in a software UI, "enable" can be a technical verb: add it with allow
+permit	v	LET	1.1	60	ste	v	high
+require	v	NECESSARY (it is necessary), MUST	1.1	60	ste	any	high
+need	v	NECESSARY (it is necessary), MUST	1.1	60	ste	any	high
+prior to	prep	BEFORE	1.1	60	ste	any	high
+however	adv	BUT	1.1	60	ste	any	high
+commence	v	START	1.1	60	ste	any	high
+begin	v	START	1.1	60	ste	any	high
+obtain	v	GET	1.1	60	ste	any	high
+should	v	MUST (instruction), IF (condition)	1.1	60	ste	any	high
+shall	v	MUST	1.1	60	ste	any	high
+may	v	CAN, POSSIBLY	1.1	60	ste	any	high
+might	v	CAN, POSSIBLY	1.1	60	ste	any	high	not in the dictionary
+would	v	CAN, WILL	1.1	60	ste	any	high
+could	v	CAN, POSSIBLY	1.3	80	ste	any	low	approved only as the past tense of CAN
+have to	v	MUST	1.1	60	ste	any	high
+ought to	v	MUST	1.1	60	ste	any	high	not in the dictionary
+via	prep	THROUGH, WITH	1.1	60	ste	any	high
+whether	conj	IF	1.1	60	ste	any	high
+additional	adj	MORE, OTHER	1.1	60	ste	any	high
+several	adj	SOME, MANY	1.1	60	ste	any	high
+various	adj	DIFFERENT	1.1	60	ste	any	high
+within	prep	IN	1.1	60	ste	any	high
+indicate	v	SHOW	1.1	60	ste	any	high
+assist	v	HELP	1.1	60	ste	any	high
+facilitate	v	HELP	1.1	60	ste	any	high
+terminate	v	STOP	1.1	60	ste	any	high
+test	v	DO A TEST	1.2	60	ste	v	high	TEST is approved only as a noun
+check	v	MAKE SURE (that), EXAMINE, MEASURE	1.2	60	ste	v	high	CHECK is approved only as a noun
+therefore	adv	THUS	1.1	80	ste	any	high
+adequate	adj	SUFFICIENT	1.1	80	ste	any	high
+insufficient	adj	NOT SUFFICIENT	1.1	80	ste	any	high
+appropriate	adj	APPLICABLE, CORRECT	1.1	80	ste	any	high
+relevant	adj	RELATED, APPLICABLE	1.1	80	ste	any	high
+significant	adj	IMPORTANT, LARGE	1.1	80	ste	any	high
+accomplish	v	DO, COMPLETE	1.1	80	ste	any	high
+achieve	v	GET	1.1	80	ste	any	high
+acquire	v	GET	1.1	80	ste	any	high
+attempt	v	TRY	1.1	80	ste	any	high
+capability	n	FUNCTION, CAN	1.1	80	ste	any	high
+comprise	v	HAVE, CONTAIN	1.1	80	ste	any	high
+consider	v	THINK, EXAMINE	1.1	80	ste	any	high
+determine	v	FIND, SELECT	1.1	80	ste	any	high
+eliminate	v	REMOVE, PREVENT	1.1	80	ste	any	high
+employ	v	USE	1.1	80	ste	any	high
+encounter	v	FIND, BE	1.1	80	ste	any	high
+establish	v	MAKE SURE (that), MAKE	1.1	80	ste	any	high
+evaluate	v	EXAMINE	1.1	80	ste	any	high
+execute	v	DO	1.1	80	ste	any	low	in software, "execute" can be a technical verb: add it with allow
+create	v	MAKE	1.1	80	ste	any	low	in software, "create" can be a technical verb: add it with allow
+delete	v	ERASE, REMOVE	1.1	80	ste	any	low	in software, "delete" can be a technical verb: add it with allow
+fasten	v	ATTACH	1.1	80	ste	any	high
+feasible	adj	POSSIBLE	1.1	80	ste	any	high
+fundamental	adj	IMPORTANT, PRIMARY	1.1	80	ste	any	high
+generate	v	MAKE, SUPPLY	1.1	80	ste	any	high
+implement	v	DO, MAKE	1.1	80	ste	v	high
+inform	v	TELL	1.1	80	ste	any	high
+notify	v	TELL	1.1	80	ste	any	high
+initiate	v	START	1.1	80	ste	any	high
+inspect	v	EXAMINE	1.1	80	ste	any	high
+maintain	v	KEEP, HOLD	1.1	80	ste	any	high
+modify	v	CHANGE	1.1	80	ste	any	high
+observe	v	MONITOR, SEE, OBEY	1.1	80	ste	any	high
+proceed	v	CONTINUE, GO	1.1	80	ste	any	high
+reduce	v	DECREASE	1.1	80	ste	any	high
+remain	v	STAY, CONTINUE	1.1	80	ste	any	high	REMAINING (adj) is approved
+request	v	TELL, WRITE	1.1	80	ste	v	high
+retain	v	KEEP	1.1	80	ste	any	high
+submit	v	SEND, GIVE	1.1	80	ste	any	high
+suitable	adj	APPLICABLE, CORRECT	1.1	80	ste	any	high
+upon	prep	ON, WHEN	1.1	80	ste	any	high
+whilst	conj	WHILE	1.1	80	ste	any	high
+often	adv	FREQUENTLY	1.1	80	ste	any	high
+never	adv	DO NOT (instruction), NOT	1.1	80	ste	any	high
+nearly	adv	ALMOST	1.1	80	ste	any	high
+ability	n	CAN	1.1	80	ste	any	high
+unable	adj	CANNOT	1.1	80	ste	any	high
+big	adj	LARGE	1.1	80	ste	any	high
+huge	adj	LARGE, VERY LARGE	1.1	80	ste	any	high
+tiny	adj	SMALL, VERY SMALL	1.1	80	ste	any	high	not in the dictionary
+quick	adj	QUICKLY, FAST	1.1	80	ste	any	high
+difficult	adj	NOT EASY	1.1	80	ste	any	high
+simple	adj	EASY	1.1	80	ste	any	high	not in the dictionary
+efficient	adj	SATISFACTORY, (give the value)	1.1	80	ste	any	high
+specific	adj	SPECIFIED, APPLICABLE	1.1	80	ste	any	high
+certain	adj	SURE, SOME, SPECIFIED	1.1	80	ste	any	high
+entire	adj	FULL, ALL	1.1	80	ste	any	high
+whole	adj	FULL, ALL	1.1	80	ste	any	high
+main	adj	PRIMARY	1.1	80	ste	any	high
+major	adj	PRIMARY, LARGE	1.1	80	ste	any	high
+minor	adj	SMALL	1.1	80	ste	any	high
+similar	adj	EQUIVALENT, ALMOST THE SAME	1.1	80	ste	any	high
+common	adj	SAME, USUAL	1.1	80	ste	any	high
+critical	adj	IMPORTANT, CAREFUL	1.1	80	ste	any	high
+vital	adj	MANDATORY, IMPORTANT	1.1	80	ste	any	high
+crucial	adj	IMPORTANT, MANDATORY	1.1	80	ste	any	high	not in the dictionary
+essential	adj	NECESSARY, MANDATORY	1.1	80	ste	any	high	not in the dictionary
+numerous	adj	MANY	1.1	80	ste	any	high	not in the dictionary
+multiple	adj	MANY, MORE THAN ONE	1.1	80	ste	any	high	not in the dictionary
+few	adj	SOME, NOT MANY	1.1	80	ste	any	high
+every	adj	ALL, EACH	1.1	80	ste	any	high
+another	adj	ONE MORE, DIFFERENT	1.1	80	ste	any	high
+both	adj	THE TWO	1.1	80	ste	any	high
+either	conj	OR, ONE (OF THE TWO)	1.1	80	ste	any	high
+neither	pron	NOT ... OR, NO	1.1	80	ste	any	high
+following	adj	THESE, THAT FOLLOW	1.1	80	ste	any	high
+helpful	adj	HELP (it helps)	1.1	80	ste	any	high
+useful	adj	HELP (it helps)	1.1	80	ste	any	high	not in the dictionary
+yet	conj	BUT	1.1	80	ste	any	high
+instead	adv	ALTERNATIVE	1.1	80	ste	any	high
+instead of	prep	ALTERNATIVE (as an alternative to)	1.1	80	ste	any	high
+otherwise	adv	IF NOT, DIFFERENTLY	1.1	80	ste	any	high
+whenever	conj	WHEN	1.1	80	ste	any	high
+once	conj	WHEN	1.1	80	ste	any	low	approved only as a count ("one time"): check the meaning
+since	conj	BECAUSE	1.3	80	ste	any	low	SINCE is approved only for time
+enough	adj	SUFFICIENT	1.1	80	ste	any	high
+great	adj	LARGE, VERY	1.1	80	ste	any	high
+produce	v	MAKE, CAUSE, GIVE	1.1	80	ste	any	high
+affect	v	CHANGE, (have an) EFFECT	1.1	80	ste	any	high
+impact	n	EFFECT	1.1	80	ste	any	high
+way	n	PROCEDURE, METHOD	1.1	80	ste	any	high
+people	n	PERSON, PERSONNEL	1.1	80	ste	any	high
+kind	n	TYPE	1.1	80	ste	any	high
+option	n	ALTERNATIVE	1.1	80	ste	any	low	in software, "option" is often a technical noun: add it with allow
+issue	n	PROBLEM	1.1	80	ste	any	low	not in the dictionary. A ticket name ("GitHub issue") is a technical noun
+place	v	PUT	1.1	80	ste	v	high
+ask	v	TELL, SPEAK	1.1	80	ste	any	high
+take	v	REMOVE, GET, READ	1.1	80	ste	any	high
+decide	v	SELECT	1.1	80	ste	any	high
+choose	v	SELECT	1.1	80	ste	any	high
+happen	v	OCCUR	1.1	80	ste	any	high
+protect	v	PREVENT (damage)	1.1	80	ste	any	high
+split	v	DIVIDE	1.1	80	ste	any	high
+combine	v	MIX, PUT TOGETHER	1.1	80	ste	any	high
+appear	v	SHOW, COME INTO VIEW	1.1	80	ste	any	high
+repeat	v	DO ... AGAIN	1.1	80	ste	any	high
+finish	v	COMPLETE	1.1	80	ste	any	high
+understand	v	KNOW	1.1	80	ste	any	high	not in the dictionary
+involve	v	HAVE, INCLUDE	1.1	80	ste	any	high	not in the dictionary
+per	prep	FOR EACH	1.1	80	ste	any	high
+among	prep	IN, BETWEEN	1.1	80	ste	any	high
+exactly	adv	ACCURATELY, FULLY	1.1	80	ste	any	high
+still	adv	CONTINUE, STAY	1.1	80	ste	any	high
+now	adv	AT THIS TIME, (delete)	1.1	80	ste	any	high
+just	adv	IMMEDIATELY, ONLY	1.1	80	ste	any	high
+already	adv	(delete), BEFORE	1.1	80	ste	any	high
+soon	adv	IN A SHORT TIME, (give the time)	1.1	80	ste	any	high
+ready	adj	PREPARED	1.1	80	ste	any	high
+furthermore	adv	ALSO	1.1	80	ste	any	high	not in the dictionary
+moreover	adv	ALSO	1.1	80	ste	any	high	not in the dictionary
+additionally	adv	ALSO	1.1	80	ste	any	high	not in the dictionary
+consequently	adv	THUS	1.1	80	ste	any	high	not in the dictionary
+hence	adv	THUS	1.1	80	ste	any	high	not in the dictionary
+though	conj	ALTHOUGH	1.1	80	ste	any	high	not in the dictionary
+whereas	conj	BUT	1.1	80	ste	any	high	not in the dictionary
+typically	adv	USUALLY	1.1	80	ste	any	high	not in the dictionary
+probably	adv	POSSIBLY	1.1	80	ste	any	high	not in the dictionary
+perhaps	adv	POSSIBLY	1.1	80	ste	any	high	not in the dictionary
+maybe	adv	POSSIBLY	1.1	80	ste	any	high	not in the dictionary
+sometimes	adv	IN SOME CONDITIONS	1.1	80	ste	any	high	not in the dictionary
+simply	adv	(delete)	1.1	80	ste	any	high	not in the dictionary
+really	adv	(delete)	1.1	80	ste	any	high	not in the dictionary
+actually	adv	(delete)	1.1	80	ste	any	high	not in the dictionary
+basically	adv	(delete)	1.1	80	ste	any	high	not in the dictionary
+essentially	adv	(delete)	1.1	80	ste	any	high	not in the dictionary
+obviously	adv	(delete), CLEARLY	1.1	80	ste	any	high	not in the dictionary
+so	conj	THUS, BECAUSE	1.1	80	ste	any	low	not in the dictionary
+like	prep	SUCH AS, EQUIVALENT TO	1.1	80	ste	any	low	not in the dictionary
+a lot of	adj	MANY, MUCH	1.1	80	ste	any	high	not in the dictionary
+lots of	adj	MANY, MUCH	1.1	80	ste	any	high	not in the dictionary
+thing	n	(name the item)	1.1	80	ste	any	high	not in the dictionary
+due to	prep	BECAUSE OF	1.1	80	ste	any	high
+according to	prep	REFER TO, AS GIVEN IN	1.1	80	ste	any	high
+next to	prep	ADJACENT TO	1.1	80	ste	any	high
+close to	prep	NEAR	1.1	80	ste	any	high
+by means of	prep	WITH	1.1	80	ste	any	high
+subsequent to	prep	AFTER	1.1	80	ste	any	high
+up to	prep	UNTIL, A MAXIMUM OF	1.1	80	ste	any	high
+make certain	v	MAKE SURE (that)	1.1	80	ste	any	high
+take care	v	MAKE SURE (that), BE CAREFUL	1.1	80	ste	any	high
+consist of	v	HAVE, CONTAIN	1.1	80	ste	any	high
+dispose of	v	DISCARD	1.1	80	ste	any	high
+carry out	v	DO	9.3	80	ste	any	high
+set up	v	INSTALL, PREPARE	9.3	80	ste	any	high
+find out	v	FIND	9.3	80	ste	any	high
+figure out	v	FIND	9.3	80	ste	any	high
+look into	v	EXAMINE	9.3	80	ste	any	high
+look up	v	FIND	9.3	80	ste	any	high
+point out	v	SHOW, TELL	9.3	80	ste	any	high
+end up	v	BECOME, (give the result)	9.3	80	ste	any	high
+get rid of	v	REMOVE	9.3	80	ste	any	high
+turn on	v	SET ... TO ON, START	9.3	80	ste	any	high
+turn off	v	SET ... TO OFF, STOP	9.3	80	ste	any	high
+switch on	v	SET ... TO ON, START	9.3	80	ste	any	high
+switch off	v	SET ... TO OFF, STOP	9.3	80	ste	any	high
+shut down	v	STOP	9.3	80	ste	any	high
+slow down	v	DECREASE (the speed)	9.3	80	ste	any	high
+hook up	v	CONNECT	9.3	80	ste	any	high
+top off	v	FILL	9.3	80	ste	any	high
+pick up	v	LIFT, GET	9.3	80	ste	any	high
+in order to	conj	TO	HS	80	house	any	high
+a number of	adj	SOME, MANY	HS	80	house	any	high
+due to the fact that	conj	BECAUSE	HS	80	house	any	high
+it should be noted that	conj	(delete)	HS	80	house	any	high
+in the event that	conj	IF	HS	80	house	any	high
+make use of	v	USE	HS	80	house	any	high
+in addition	adv	ALSO	HS	80	house	any	high
+as well as	conj	AND	HS	80	house	any	high
+at this point in time	adv	AT THIS TIME	HS	80	house	any	high
